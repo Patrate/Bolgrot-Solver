@@ -1,0 +1,2553 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bolgrot Solveur</title>
+<link rel="stylesheet" href="common.css" />
+<link rel="stylesheet" href="bolgrot.css" />
+
+<style id="detectionLegendStyles">
+  .detection-legend{margin:12px 0 0;padding:12px;border:1px solid rgba(148,163,184,.34);border-radius:10px;background:rgba(15,23,42,.52);display:grid;gap:9px}
+  .detection-legend h4{margin:0;font-size:.94rem}
+  .detection-legend-row{display:grid;grid-template-columns:56px minmax(0,1fr);align-items:center;gap:9px;line-height:1.18}
+  .detection-legend-row strong{display:block;font-size:.9rem}
+  .detection-legend-row span{display:block;margin-top:2px;font-size:.78rem;color:var(--muted,#cbd5e1)}
+  .legend-cell-icon{width:56px;height:30px;display:block;overflow:visible}
+  .legend-letter{font:900 17px system-ui,sans-serif;fill:#f8fafc;stroke:#111827;stroke-width:3px;paint-order:stroke}
+  .legend-question{font:900 16px system-ui,sans-serif;fill:#fde047;stroke:#111827;stroke-width:3px;paint-order:stroke}
+  .detection-legend-note{padding:8px 9px;border-radius:8px;background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.38);font-size:.82rem;line-height:1.32;color:#fef3c7}
+  .suspect-default-notice{margin-top:10px;padding:9px 10px;border-radius:8px;background:rgba(250,204,21,.13);border:1px solid rgba(250,204,21,.42);color:#fef3c7;font-size:.84rem;line-height:1.35}
+  .pre-import-solver-notice{margin:10px 0 0;padding:9px 10px;border-radius:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.46);color:#fecaca;font-size:.86rem;font-weight:800;line-height:1.35;text-align:center}
+  .copyright-panel{flex:0 0 auto;margin:-2px 0 0;padding:0 4px;text-align:center;color:var(--muted-2,#94a3b8);font-size:11px;line-height:1.25}
+  .copyright-panel a{color:#93c5fd;text-decoration:none;font-weight:700}
+  .copyright-panel a:hover{text-decoration:underline}
+  .labels-toggle.active{box-shadow:inset 0 0 0 1px rgba(250,204,21,.62);color:#fef3c7}
+  .labels-toggle:not(.active){opacity:.76}
+</style>
+</head>
+<body>
+<div id="alertBanner" class="alert-banner hidden" role="alert" aria-live="assertive"><div id="alertBannerText"></div><button id="alertBannerClose" type="button" aria-label="Fermer l’alerte">×</button></div>
+<div class="app">
+  <aside class="panel">
+    <div class="sidebar-main">
+    <div class="top-actions">
+      <button id="restartBtn" class="btn" type="button">Recommencer</button>
+      <button id="openTutorialBtn" class="btn" type="button">Tutoriel</button>
+    </div>
+    <details id="tutorialBox" class="tutorial-box">
+      <summary>Tutoriel</summary>
+      <div class="tutorial-content">
+        <ol>
+          <li><span class="tooltip-trigger" tabindex="0">Retire toute interface du champ de bataille<a href="tuto1.png" target="_blank" rel="noopener" class="tutorial-help-mark" aria-label="Voir l’image d’aide">❔</a><span class="tooltip-box"><span class="tooltip-text">Aperçu : interface du champ de bataille à retirer.</span><img src="tuto1.png" alt="Tutoriel Bolgrot : retirer l’interface du champ de bataille" class="tooltip-image"></span></span></li>
+          <li><span class="tooltip-trigger" tabindex="0">Mets-toi en mode créature<a href="tuto2.png" target="_blank" rel="noopener" class="tutorial-help-mark" aria-label="Voir l’image d’aide">❔</a><span class="tooltip-box"><span class="tooltip-text">Aperçu : activer le mode créature.</span><img src="tuto2.png" alt="Tutoriel Bolgrot : activer le mode créature" class="tooltip-image"></span></span></li>
+          <li><span class="tooltip-trigger" tabindex="0">Passe les 5 premiers tours sans bouger<a href="tuto3.png" target="_blank" rel="noopener" class="tutorial-help-mark" aria-label="Voir l’image d’aide">❔</a><span class="tooltip-box"><span class="tooltip-text">Aperçu : passer les premiers tours sans bouger.</span><img src="tuto3.png" alt="Tutoriel Bolgrot : passer les premiers tours sans bouger" class="tooltip-image"></span></span></li>
+          <li>Au tour 6, prends un screenshot avec le champ de bataille entier.</li>
+          <li>Glisse l’image, clique pour choisir un fichier ou colle le screenshot avec Ctrl+V.</li>
+          <li>Vérifie que tout est correct, corrige si besoin.</li>
+          <li>Clique sur “Résoudre”.</li>
+          <li>Suis les instructions jusqu’à la victoire.</li>
+        </ol>
+      </div>
+    </details>
+
+    <section id="phaseImport" class="phase active">
+      <h3>Importe un screenshot du tour 6</h3>
+      <div id="dropZone">
+        <strong>Importer un screenshot T6</strong>
+        Glisse l’image ici, clique pour choisir un fichier
+        <span class="drop-shortcut">ou colle directement le screenshot avec <kbd>Ctrl</kbd> + <kbd>V</kbd></span>
+        <input type="file" id="fileInput" accept="image/*" class="hidden">
+      </div>
+      <input id="startTurn" type="hidden" value="6">
+      <input id="startPv" type="hidden" value="40">
+      <input id="timeBudgetS" type="hidden" value="60">
+      <button id="solveBtn" class="btn-primary big-action" disabled>Résoudre</button>
+      <div id="preImportSolverNotice" class="pre-import-solver-notice">97% de taux de résolution garanti. Temps de calcul moyen 5 secondes (max 60 secondes)</div>
+      <div id="t5Editor" class="editor-card hidden">
+        <h4>Correction rapide de la détection</h4>
+        <div>Optionnel : clique une case de la grille pour ajouter ou retirer un feu ou un glyphe avant de résoudre.</div>
+        <div class="editor-tools" role="group" aria-label="Type de correction">
+          <button id="editFireBtn" class="btn active" type="button">Feu</button>
+          <button id="editGlyphBtn" class="btn" type="button">Glyphe</button>
+          <button id="editEmptyBtn" class="btn" type="button">Vide</button>
+          <button id="resetDetectionBtn" class="btn full" type="button">Réinitialiser la détection</button>
+        </div>
+        <div class="editor-counts">
+          <div class="kv"><span>Feux</span><span id="editFireCount">—</span></div>
+          <div class="kv"><span>Glyphes</span><span id="editGlyphCount">—</span></div>
+        </div>
+        <div id="suspectDefaultNotice" class="suspect-default-notice hidden" role="note"></div>
+        <div class="editor-help">Ce mini-éditeur disparaît dès que tu lances la résolution.</div>
+      </div>
+
+      <section id="detectionLegend" class="detection-legend hidden" aria-labelledby="detectionLegendTitle">
+        <h4 id="detectionLegendTitle">Légende de détection</h4>
+        <div class="detection-legend-row">
+          <svg class="legend-cell-icon" viewBox="0 0 64 34" aria-hidden="true"><polygon points="32,2 61,17 32,32 3,17" fill="#ef6c1a" fill-opacity=".85" stroke="#7c2d12" stroke-width="2"/><text x="32" y="22" text-anchor="middle" class="legend-letter">F</text></svg>
+          <div><strong>F · Feu</strong><span>Case détectée comme feu.</span></div>
+        </div>
+        <div class="detection-legend-row">
+          <svg class="legend-cell-icon" viewBox="0 0 64 34" aria-hidden="true"><polygon points="32,2 61,17 32,32 3,17" fill="#7e22ce" fill-opacity=".42" stroke="#d946ef" stroke-width="2" stroke-dasharray="5 3"/><text x="32" y="22" text-anchor="middle" class="legend-letter">G</text></svg>
+          <div><strong>G · Glyphe</strong><span>Case détectée comme glyphe.</span></div>
+        </div>
+        <div class="detection-legend-row">
+          <svg class="legend-cell-icon" viewBox="0 0 64 34" aria-hidden="true"><polygon points="32,2 61,17 32,32 3,17" fill="#f59e0b" fill-opacity=".16" stroke="#facc15" stroke-width="3" stroke-dasharray="6 3"/><text x="32" y="22" text-anchor="middle" class="legend-letter">F</text><text x="52" y="15" text-anchor="middle" class="legend-question">?</text></svg>
+          <div><strong>Case douteuse</strong><span>F ou G indique le type supposé ; le <b>?</b> demande une vérification.</span></div>
+        </div>
+        <div class="detection-legend-note"><strong>Important :</strong> une case jaune non corrigée est considérée <strong>vide</strong> quand tu lances la résolution.</div>
+      </section>
+    </section>
+
+    <section id="phaseSteps" class="phase">
+      <h3 id="stepsTitle">Actions</h3>
+      <p id="stepsHint" class="phase-lead">Suis les actions dans l’ordre.</p>
+      <div id="stepNav">
+        <div class="step-controls">
+          <button id="prevStep" class="btn" aria-label="Étape précédente">◀</button>
+          <div id="stepCounter" class="step-counter">0 / 0</div>
+          <button id="nextStep" class="btn" aria-label="Étape suivante">▶</button>
+        </div>
+		<div class="secondary-row">
+          <button id="autoPlayBtn" class="btn">Auto play</button>
+          <label>Délai <input id="stepDelayS" type="number" min="0.3" max="10" step="0.1" value="2.5"> s</label>
+        </div>
+        <div class="mini-stats">
+          <div class="kv"><span>PV · PA</span><span id="stepPvPa">—</span></div>
+          <div class="kv"><span>Tour</span><span id="stepTurn">—</span></div>
+        </div>
+      </div>
+      <div id="actionsList" class="actions-list"></div>
+    </section>
+
+
+    </div>
+    <div class="console-panel" aria-live="polite">
+      <div class="console-label">Console</div>
+      <div id="consoleMessage" class="console-message">Prêt. Importe un screenshot T6.</div>
+    </div>
+    <div class="copyright-panel">© 2026 <a href="https://emmathie.fr" target="_blank" rel="noopener">Emmathie</a></div>
+    <details id="debugPanel" class="debug-panel hidden">
+      <summary>Debug avancé</summary>
+      <div class="debug-buttons">
+        <button id="copyPlanBtn" class="btn hidden">Copier le plan</button>
+        <button id="exportPlanBtn" class="btn hidden">Exporter JSON</button>
+      </div>
+      <div id="results" class="hidden">
+        <hr class="sidebar-sep">
+        <div class="kv"><span>Confiance</span><span id="rConf">—</span></div>
+        <div class="kv"><span>Ennemis détectés</span><span id="rEnemies">—</span></div>
+        <div class="kv"><span>Glyphes détectés</span><span id="rGlyphs">—</span></div>
+        <div class="kv"><span>À vérifier</span><span id="rSuspects">—</span></div>
+        <div class="kv"><span>Joueur (px)</span><span id="rPlayer">—</span></div>
+        <div class="kv"><span>Bolgrot (px)</span><span id="rBolgrot">—</span></div>
+        <div class="kv"><span>Tuile</span><span id="rTile">—</span></div>
+        <div class="kv"><span>Ratio h/l</span><span id="rRatio">—</span></div>
+        <div class="kv"><span>Recouvrement champ</span><span id="rIou">—</span></div>
+        <div class="kv"><span>Désaccord ancres Y</span><span id="rResid">—</span></div>
+      </div>
+      <div id="solveSummary" class="hidden">
+        <hr class="sidebar-sep">
+        <div class="kv"><span>Résultat</span><span id="sRes">—</span></div>
+        <div class="kv"><span>Actions · temps</span><span id="sActions">—</span></div>
+        <div class="kv"><span>Ennemis restants</span><span id="sRemain">—</span></div>
+        <div class="kv"><span>PV final</span><span id="sPv">—</span></div>
+        <div class="kv"><span>Nœuds explorés</span><span id="sNodes">—</span></div>
+        <div class="kv"><span>Budget / fast</span><span id="sBudgetFast">—</span></div>
+        <div class="kv"><span>Adaptive V63B</span><span id="sAdaptiveV58A4">—</span></div>
+        <div class="kv"><span>TT / dominance</span><span id="sTT">—</span></div>
+        <div class="kv"><span>Pruning</span><span id="sPrune">—</span></div>
+        <div class="kv"><span>Diversité</span><span id="sDiversity">—</span></div>
+        <div class="kv"><span>Stratégie</span><span id="sStrategy">—</span></div>
+      </div>
+      <div id="stepAudit" class="audit-box hidden"></div>
+      <div id="solverBox" class="hidden"></div>
+    </details>
+  </aside>
+
+  <main class="panel">
+    <div class="viewtabs">
+      <button id="toggleLabelsBtn" class="btn labels-toggle active" type="button" aria-pressed="true" title="Masquer les lettres F et G sur les cases">Labels : ON</button>
+      <button id="tabGrid" class="btn active">Grille</button>
+      <button id="tabImage" class="btn" disabled>Image + overlay</button>
+    </div>
+    <div class="board-shell" id="gridWrap">
+      <div class="board-topbar"><div id="mainAction" class="step-pill hidden" aria-live="polite"></div></div>
+      <svg id="boardSvg" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    <div id="overlayWrap">
+      <canvas id="overlayCanvas"></canvas>
+    </div>
+  </main>
+</div>
+<script src="bolgrot_rules.js"></script>
+<script src="bolgrot_strategies.js"></script>
+<script src="bolgrot_solver_engine.js"></script>
+<script src="bolgrot_weight_profiles.js"></script>
+<script src="bolgrot_detection.js"></script>
+<script>
+window.__BOLGROT_API_COMPAT_SHIM_SOURCE = String.raw`(function(root){
+  "use strict";
+  function missingFunction(name){
+    return function(){ throw new Error("Dépendance Bolgrot manquante: " + name); };
+  }
+  if (!("solveBolgrot" in root)) {
+    root.solveBolgrot = function(){
+      throw new Error("solveBolgrot introuvable: bolgrot_solver_engine.js n'expose pas de solveur compatible.");
+    };
+  }
+  var fnNames = [
+    "handleConfig","solveLDS","solvePortfolio","buildContext","buildInitialState",
+    "attractFires","repulse","repulseDetailed","primaryStep","primaryDestination","primaryClaimCounts",
+    "countPrimaryClaimsTo","hasPrimaryClaimCollisionNear","hasRepulsedOriginReclaimConflict","hasChainPressureToPlayer",
+    "applyAction","simulateActionDetailed","expandDetailed","scoreStateDetailed","scoreNodeDetailed","tacticalStateMetrics",
+    "buildPlanAudit","enumerateActions",
+    "selectBeamV38","v38LinePlanningScore","v38ActionProbeCached","mkState","stateKey","idxToCell",
+    "analyzeImage","analyzeImageData","findAnchors","detectEnemies","detectGlyphs","isGlyphPixelRGB","screenToGridApprox"
+  ];
+  for (var i=0;i<fnNames.length;i++) {
+    var n = fnNames[i];
+    if (!(n in root)) root[n] = missingFunction(n);
+  }
+  if (!("DEFAULT_BOARD" in root)) root.DEFAULT_BOARD = null;
+  if (!("DEFAULT_PLAYER" in root)) root.DEFAULT_PLAYER = null;
+  if (!("DEFAULT_BOLGROT" in root)) root.DEFAULT_BOLGROT = null;
+  if (!("DETECTION_CELLS" in root)) root.DETECTION_CELLS = null;
+})(typeof self !== "undefined" ? self : window);`;
+(function(root){
+  "use strict";
+  function missingFunction(name){
+    return function(){ throw new Error("Dépendance Bolgrot manquante: " + name); };
+  }
+  if (!("solveBolgrot" in root)) {
+    root.solveBolgrot = function(){
+      throw new Error("solveBolgrot introuvable: bolgrot_solver_engine.js n'expose pas de solveur compatible.");
+    };
+  }
+  var fnNames = [
+    "handleConfig","solveLDS","solvePortfolio","buildContext","buildInitialState",
+    "attractFires","repulse","repulseDetailed","primaryStep","primaryDestination","primaryClaimCounts",
+    "countPrimaryClaimsTo","hasPrimaryClaimCollisionNear","hasRepulsedOriginReclaimConflict","hasChainPressureToPlayer",
+    "applyAction","simulateActionDetailed","expandDetailed","scoreStateDetailed","scoreNodeDetailed","tacticalStateMetrics",
+    "buildPlanAudit","enumerateActions",
+    "selectBeamV38","v38LinePlanningScore","v38ActionProbeCached","mkState","stateKey","idxToCell",
+    "analyzeImage","analyzeImageData","findAnchors","detectEnemies","detectGlyphs","isGlyphPixelRGB","screenToGridApprox"
+  ];
+  for (var i=0;i<fnNames.length;i++) {
+    var n = fnNames[i];
+    if (!(n in root)) root[n] = missingFunction(n);
+  }
+  if (!("DEFAULT_BOARD" in root)) root.DEFAULT_BOARD = null;
+  if (!("DEFAULT_PLAYER" in root)) root.DEFAULT_PLAYER = null;
+  if (!("DEFAULT_BOLGROT" in root)) root.DEFAULT_BOLGROT = null;
+  if (!("DETECTION_CELLS" in root)) root.DETECTION_CELLS = null;
+})(typeof self !== "undefined" ? self : window);
+</script>
+<script src="bolgrot_api.js"></script>
+
+<script>
+(()=>{
+"use strict";
+
+/* ---------- Board definition ---------- */
+const BOARD_DEF = [
+  '############..#################','###########....################','##########......###############',
+  '#########........##############','########..........#############','#######............############',
+  '######..............###########','#####................##########','####..................#########',
+  '###....................########','##......................#######','#........................######',
+  '..........................#####','...........................####','............................###',
+  '#..............P.............##','##............................#','###............................',
+  '####...........................','#####..........................','######.........................',
+  '#######........................','########......................#','#########....................##',
+  '##########..................###','###########................####','############..............#####',
+  '#############............######','##############..........#######','###############........########',
+  '################......#########',
+];
+const PLAYER_CELL  = {gx:15, gy:15};   // k=30, d=0
+const BOLGROT_CELL = {gx:20, gy:10};   // k=30, d=10
+
+// Parse valid cells + diagonal extremes
+const CELLS = [];
+for (let gy=0; gy<BOARD_DEF.length; gy++){
+  const row = BOARD_DEF[gy];
+  for (let gx=0; gx<row.length; gx++){
+    const c = row[gx];
+    if (c === '.' || c === 'P') CELLS.push({gx, gy});
+  }
+}
+const K_MIN = Math.min(...CELLS.map(c=>c.gx+c.gy));
+const K_MAX = Math.max(...CELLS.map(c=>c.gx+c.gy));
+
+/* ====================================================================
+   GRID RENDERING (independent iso layout, Rainikrone style)
+   ==================================================================== */
+const svg = document.getElementById('boardSvg');
+const SD = 18;                 // display tile half-width
+const RD = 0.5;                // display iso ratio
+const NS = 'http://www.w3.org/2000/svg';
+
+function dispXY(gx, gy){ return { x:(gx-gy)*SD, y:(gx+gy)*SD*RD }; }
+function diamond(px, py){
+  return `${px},${py-SD*RD} ${px+SD},${py} ${px},${py+SD*RD} ${px-SD},${py}`;
+}
+
+let markerLayer = null;
+let hoverLayer = null;
+let arrowLayer = null;
+let labelsVisible = true;
+function renderGrid(){
+  // bounds
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  for (const c of CELLS){
+    const p = dispXY(c.gx,c.gy);
+    minX=Math.min(minX,p.x-SD); maxX=Math.max(maxX,p.x+SD);
+    minY=Math.min(minY,p.y-SD*RD); maxY=Math.max(maxY,p.y+SD*RD);
+  }
+  const pad=20;
+  svg.setAttribute('viewBox', `${minX-pad} ${minY-pad} ${maxX-minX+2*pad} ${maxY-minY+2*pad}`);
+  svg.innerHTML='';
+  const g = document.createElementNS(NS,'g');
+  for (const c of CELLS){
+    const p = dispXY(c.gx,c.gy);
+    const poly = document.createElementNS(NS,'polygon');
+    poly.setAttribute('points', diamond(p.x,p.y));
+    const alt = (c.gx+c.gy)%2===0;
+    poly.setAttribute('fill', alt ? '#15324a' : '#11283b');
+    poly.setAttribute('stroke', '#0b1b2a');
+    poly.setAttribute('stroke-width', '0.6');
+    g.appendChild(poly);
+  }
+  svg.appendChild(g);
+  markerLayer = document.createElementNS(NS,'g');
+  svg.appendChild(markerLayer);
+  hoverLayer = document.createElementNS(NS,'g');
+  svg.appendChild(hoverLayer);
+  arrowLayer = document.createElementNS(NS,'g');
+  arrowLayer.setAttribute('pointer-events', 'none');
+  svg.appendChild(arrowLayer);
+}
+
+function placeMarker(cell, color, label){
+  const p = dispXY(cell.gx, cell.gy);
+  const poly = document.createElementNS(NS,'polygon');
+  poly.setAttribute('points', diamond(p.x,p.y));
+  poly.setAttribute('fill', color);
+  poly.setAttribute('fill-opacity','0.9');
+  poly.setAttribute('stroke','#fff');
+  poly.setAttribute('stroke-width','1.4');
+  markerLayer.appendChild(poly);
+  const t = document.createElementNS(NS,'text');
+  t.setAttribute('x', p.x); t.setAttribute('y', p.y - SD*RD - 4);
+  t.setAttribute('text-anchor','middle');
+  t.setAttribute('font-size','11'); t.setAttribute('font-weight','700');
+  t.setAttribute('fill', color);
+  t.textContent = label;
+  markerLayer.appendChild(t);
+}
+function clearMarkers(){ if(markerLayer) markerLayer.innerHTML=''; }
+
+// Étiquette centrale : elle ne dépend pas de la couleur de remplissage et reste
+// lisible même lorsqu'une case est entourée du cadre jaune de vérification.
+function placeTypeLetter(cell, letter){
+  if(!labelsVisible || !markerLayer || !cell || !letter) return;
+  const p = dispXY(cell.gx, cell.gy);
+  const t = document.createElementNS(NS,'text');
+  t.setAttribute('x', p.x);
+  t.setAttribute('y', p.y + 4.3);
+  t.setAttribute('text-anchor','middle');
+  t.setAttribute('font-size','13.2');
+  t.setAttribute('font-weight','900');
+  t.setAttribute('font-family','system-ui, sans-serif');
+  t.setAttribute('fill','#f8fafc');
+  t.setAttribute('stroke','#111827');
+  t.setAttribute('stroke-width','2.35');
+  t.setAttribute('paint-order','stroke');
+  t.setAttribute('pointer-events','none');
+  t.textContent=letter;
+  markerLayer.appendChild(t);
+}
+
+function placeEnemy(cell){
+  const p = dispXY(cell.gx, cell.gy);
+  const poly = document.createElementNS(NS,'polygon');
+  poly.setAttribute('points', diamond(p.x,p.y));
+  poly.setAttribute('fill', '#ef6c1a');
+  poly.setAttribute('fill-opacity','0.85');
+  poly.setAttribute('stroke','#7c2d12');
+  poly.setAttribute('stroke-width','0.8');
+  markerLayer.appendChild(poly);
+  placeTypeLetter(cell, 'F');
+}
+function placeGlyph(cell){
+  const p = dispXY(cell.gx, cell.gy);
+  const poly = document.createElementNS(NS,'polygon');
+  poly.setAttribute('points', diamond(p.x,p.y));
+  poly.setAttribute('fill', '#7e22ce');
+  poly.setAttribute('fill-opacity','0.42');
+  poly.setAttribute('stroke','#d946ef');
+  poly.setAttribute('stroke-width','1.5');
+  poly.setAttribute('stroke-dasharray','4 2');
+  markerLayer.appendChild(poly);
+  placeTypeLetter(cell, 'G');
+}
+function suspectLabel(s){
+  const kind = s && s.kind === 'glyph' ? 'Glyphe' : 'Feu';
+  const status = s && s.status === 'possible_missing' ? 'possible mais non confirmé' : 'à confirmer ou écarter';
+  const confidence = s && typeof s.confidence === 'number' ? ' · confiance '+Math.round(s.confidence*100)+' %' : '';
+  const reasons = s && Array.isArray(s.reasons) && s.reasons.length ? ' · '+s.reasons.join(', ') : '';
+  return kind+' '+status+confidence+reasons;
+}
+function placeSuspect(s){
+  if(!s || !markerLayer) return;
+  const p = dispXY(s.gx, s.gy);
+  const poly = document.createElementNS(NS,'polygon');
+  poly.setAttribute('points', diamond(p.x,p.y));
+  poly.setAttribute('fill', s.kind === 'glyph' ? '#a855f7' : '#f59e0b');
+  poly.setAttribute('fill-opacity','0.15');
+  poly.setAttribute('stroke','#facc15');
+  poly.setAttribute('stroke-width','2.5');
+  poly.setAttribute('stroke-dasharray','4 2');
+  const title = document.createElementNS(NS,'title');
+  title.textContent = suspectLabel(s);
+  poly.appendChild(title);
+  markerLayer.appendChild(poly);
+  // Le type reste explicite même sous le cadre jaune : F = feu, G = glyphe.
+  placeTypeLetter(s, s.kind === 'glyph' ? 'G' : 'F');
+  const q = document.createElementNS(NS,'text');
+  q.setAttribute('x', p.x + SD*0.48); q.setAttribute('y', p.y - SD*RD*0.22);
+  q.setAttribute('text-anchor','middle'); q.setAttribute('font-size','13'); q.setAttribute('font-weight','900');
+  q.setAttribute('fill','#fde047'); q.setAttribute('stroke','#111827'); q.setAttribute('stroke-width','2.4'); q.setAttribute('paint-order','stroke');
+  q.setAttribute('pointer-events','none'); q.textContent='?';
+  markerLayer.appendChild(q);
+}
+function drawHoverCell(cell){
+  if(!hoverLayer || !cell) return;
+  const gx = Array.isArray(cell) ? cell[0] : cell.gx;
+  const gy = Array.isArray(cell) ? cell[1] : cell.gy;
+  const p = dispXY(gx, gy);
+  const poly = document.createElementNS(NS,'polygon');
+  poly.setAttribute('points', diamond(p.x,p.y));
+  poly.setAttribute('fill', '#ffffff');
+  poly.setAttribute('fill-opacity','0.24');
+  poly.setAttribute('stroke','#ffffff');
+  poly.setAttribute('stroke-width','2.2');
+  poly.setAttribute('pointer-events','none');
+  hoverLayer.appendChild(poly);
+}
+function redrawHoverCell(){
+  if(!hoverLayer) return;
+  hoverLayer.innerHTML='';
+  if(hoverCell) drawHoverCell(hoverCell);
+}
+function setHoverCell(cell){
+  const same = (!cell && !hoverCell) || (cell && hoverCell && cell[0]===hoverCell[0] && cell[1]===hoverCell[1]);
+  if(same) return;
+  hoverCell = cell ? [cell[0], cell[1]] : null;
+  redrawHoverCell();
+}
+
+
+/* ====================================================================
+   DETECTION
+   ==================================================================== */
+// Tunables (exposed for later iteration)
+const DARK_MAX     = 90;       // sprite is dark
+const DARK_CHROMA  = 30;       // sprite is low-chroma (grayish)
+const MIN_BLOB_FRAC= 8e-5;     // blob size as fraction of image area
+const MAX_BLOB_FRAC= 7e-4;
+const FOOT_FRAC    = 0.18;     // tile centre is this fraction of tileH below the player centroid
+                               // (measured on the in-game selection diamond)
+const R_ISO        = 0.50;     // iso tile ratio (tileH/tileW). Invariant to zoom; confirmed by
+                               // lattice-snapping the 36 enemy centres (residual ~0.03).
+const ENEMY_THRESH = 0.11;     // min orange fraction in the tight body window to call it an enemy.
+                               // Validated across screenshots: lowest real enemy ~0.16 (occluded),
+                               // highest neighbour bleed ~0.07 — 0.11 sits cleanly between.
+// Glyphes violets : seuil volontairement large, car le reflet en haut-gauche les éclaircit.
+const GLYPH_MIN_COMPONENT = 80;
+const GLYPH_MAX_COMPONENT = 6000;
+
+function isGlyphPixelRGB(r, g, b){
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+  return b > 60 && r > 50 && b > g + 18 && r > g + 10 && (mx - mn) > 25;
+}
+
+function erodeMask3x3(mask, w, h){
+  // Supprime les traits fins de la grille tactique avant la recherche des ancres.
+  // À certaines résolutions, ces lignes relient le joueur/Bolgrot au décor et
+  // forment un énorme composant sombre qui touche le bord de l'image.
+  const out = new Uint8Array(w*h);
+  for(let y=1; y<h-1; y++){
+    const base = y*w;
+    for(let x=1; x<w-1; x++){
+      const i = base + x;
+      if(mask[i] && mask[i-1] && mask[i+1] && mask[i-w] && mask[i+w] &&
+         mask[i-w-1] && mask[i-w+1] && mask[i+w-1] && mask[i+w+1]) out[i]=1;
+    }
+  }
+  return out;
+}
+
+function pruneSplitGlyphArtifacts(glyphs, s){
+  // En mode grille affichée, un même glyphe peut être coupé par une ligne sombre
+  // en deux petits composants qui tombent sur deux cases voisines. T6 ne peut pas
+  // dépasser 6 glyphes : on corrige uniquement les surplus évidents.
+  const out = (glyphs || []).slice();
+  const smallMax = Math.max(260, 0.16*s*s);
+  const maxDist = Math.max(18, 0.75*s);
+  while(out.length > 6){
+    let best = null;
+    for(let i=0;i<out.length;i++) for(let j=i+1;j<out.length;j++){
+      const a=out[i], b=out[j];
+      const cheb = Math.max(Math.abs(a.gx-b.gx), Math.abs(a.gy-b.gy));
+      if(cheb > 1) continue;
+      if(a.size > smallMax || b.size > smallMax) continue;
+      const dist = Math.hypot((a.cx||0)-(b.cx||0), (a.cy||0)-(b.cy||0));
+      if(dist > maxDist) continue;
+      const penalty = Math.max(a.size,b.size) + dist*3 + (a.size+b.size)*0.05;
+      if(!best || penalty < best.penalty) best = {i,j,penalty};
+    }
+    if(!best) break;
+    const a=out[best.i], b=out[best.j];
+    const remove = a.size < b.size ? best.i : best.j;
+    out.splice(remove, 1);
+  }
+  return out.sort((a,b)=> (a.gy-b.gy) || (a.gx-b.gx));
+}
+
+function blobGlyphHits(glyphMask, w, h, blob, pad){
+  const x0 = Math.max(0, (blob.xmin - pad)|0), x1 = Math.min(w-1, (blob.xmax + pad)|0);
+  const y0 = Math.max(0, (blob.ymin - pad)|0), y1 = Math.min(h-1, (blob.ymax + pad)|0);
+  let n = 0;
+  for(let y=y0;y<=y1;y++){ const base=y*w; for(let x=x0;x<=x1;x++) if(glyphMask[base+x]) n++; }
+  return n;
+}
+
+function buildCanvas(img){
+  const w = img.width, h = img.height;
+  const cv = document.createElement('canvas'); cv.width=w; cv.height=h;
+  const ctx = cv.getContext('2d', {willReadFrequently:true});
+  ctx.drawImage(img, 0, 0);
+  return { canvas:cv, ctx, w, h };
+}
+
+// --- connected components on a boolean mask (4-conn flood fill) ---
+function components(mask, w, h){
+  const lbl = new Int32Array(w*h).fill(-1);
+  const stack = new Int32Array(w*h);
+  const blobs = [];
+  for (let i=0;i<w*h;i++){
+    if (!mask[i] || lbl[i]!==-1) continue;
+    const id = blobs.length;
+    let sp=0; stack[sp++]=i; lbl[i]=id;
+    let n=0, sx=0, sy=0, xmin=w, xmax=0, ymin=h, ymax=0, touch=false;
+    while(sp>0){
+      const p=stack[--sp];
+      const x=p%w, y=(p/w)|0;
+      n++; sx+=x; sy+=y;
+      if(x<xmin)xmin=x; if(x>xmax)xmax=x; if(y<ymin)ymin=y; if(y>ymax)ymax=y;
+      if(x<=1||y<=1||x>=w-2||y>=h-2) touch=true;
+      if(x>0   && mask[p-1] && lbl[p-1]===-1){lbl[p-1]=id;stack[sp++]=p-1;}
+      if(x<w-1 && mask[p+1] && lbl[p+1]===-1){lbl[p+1]=id;stack[sp++]=p+1;}
+      if(y>0   && mask[p-w] && lbl[p-w]===-1){lbl[p-w]=id;stack[sp++]=p-w;}
+      if(y<h-1 && mask[p+w] && lbl[p+w]===-1){lbl[p+w]=id;stack[sp++]=p+w;}
+    }
+    blobs.push({size:n, cx:sx/n, cy:sy/n, xmin, xmax, ymin, ymax, touch});
+  }
+  return blobs;
+}
+
+// --- find player & bolgrot among neutral-dark blobs ---
+
+function candidateAnchorBlobs(mask, w, h, glyphMask, minSz, maxSz, source) {
+  return components(mask, w, h).filter(function (bb) {
+    return !bb.touch && bb.size >= minSz && bb.size <= maxSz &&
+      bb.cx > 0.12*w && bb.cx < 0.92*w && bb.cy > 0.18*h && bb.cy < 0.82*h &&
+      blobGlyphHits(glyphMask, w, h, bb, 8) < 18;
+  }).map(function (bb) {
+    bb.anchor_source = source;
+    return bb;
+  });
+}
+
+function scoreAnchorPairWithCalibration(L, R, field, orange, w, h, baseScore) {
+  // La paire d'ancres ne doit plus être choisie uniquement sur la forme des
+  // blobs sombres : certains décors sombres en bas-gauche peuvent imiter deux
+  // petits sprites. On projette donc une grille candidate et on mesure si elle
+  // retrouve réellement le plateau + les feux orange.
+  var s = (R.cx - L.cx) / 10;
+  if (!isFinite(s) || s <= 15 || s >= 90) return null;
+
+  var fit = computeVertical(field, w, h, s, L.cx, L.cy);
+  var enemies = detectEnemies(orange, w, h, s, L.cx, fit.Oy, fit.r);
+  var ys = 0.28 * 2 * s * fit.r;
+  var dev = 0;
+  for (var i=0; i<enemies.length; i++) {
+    var e = enemies[i];
+    var ex = L.cx + (e.gx - e.gy) * s;
+    var ey = fit.Oy + (e.gx + e.gy) * s * fit.r - ys;
+    dev += Math.hypot(e.ox - ex, e.oy - ey);
+  }
+  var meanDev = enemies.length ? dev / enemies.length : 999;
+  var resid = Math.abs(L.cy - R.cy);
+
+  var score = baseScore +
+    6.0 * fit.onFrac +
+    0.25 * Math.min(enemies.length, 36) -
+    0.12 * meanDev -
+    Math.min(3.0, (resid / Math.max(1, s * fit.r)) * 0.35);
+
+  if (enemies.length < 24) score -= (24 - enemies.length) * 0.85;
+  if (fit.onFrac < 0.52) score -= (0.52 - fit.onFrac) * 10.0;
+  if (enemies.length > 40) score -= (enemies.length - 40) * 0.40;
+
+  return {
+    score: score,
+    baseScore: baseScore,
+    s: s,
+    onFrac: fit.onFrac,
+    enemiesCount: enemies.length,
+    meanDev: meanDev,
+    resid: resid,
+    source: L.anchor_source || R.anchor_source || 'unknown'
+  };
+}
+
+function findAnchors(data, w, h) {
+  var N = w*h;
+  var sprite = new Uint8Array(N);
+  var field = new Uint8Array(N);
+  var orange = new Uint8Array(N);
+  var glyphMask = new Uint8Array(N);
+
+  for (var i=0, p=0; i<N; i++, p+=4) {
+    var r = data[p], g = data[p+1], b = data[p+2];
+    var mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+    var glyphish = isGlyphPixelRGB(r,g,b);
+    if (glyphish) glyphMask[i] = 1;
+    if (g > r + 4 && g > 80 && b > g - 70 && b < g + 50 && (r+g+b) > 150) field[i] = 1;
+    if (r > 150 && r > g + 18 && g > b - 5 && (r-b) > 55) orange[i] = 1;
+    if (!glyphish && mx < DARK_MAX && (mx-mn) < DARK_CHROMA && b >= g-8 && r <= g+12) sprite[i] = 1;
+  }
+
+  var area = N;
+  var minSz = MIN_BLOB_FRAC * area, maxSz = MAX_BLOB_FRAC * area;
+
+  // Deux chemins complémentaires :
+  // - brut : garde les anciens screenshots qui fonctionnaient très bien ;
+  // - érodé : coupe les traits fins de la grille tactique quand elle est visible.
+  // Le choix final se fait par validation de grille, pas par confiance aveugle.
+  var rawBlobs = candidateAnchorBlobs(sprite, w, h, glyphMask, minSz, maxSz, 'raw');
+  var erodedBlobs = candidateAnchorBlobs(erodeMask3x3(sprite, w, h), w, h, glyphMask, minSz, maxSz, 'eroded');
+  var blobGroups = [rawBlobs, erodedBlobs];
+  var blobs = rawBlobs.concat(erodedBlobs);
+
+  var best = null;
+  for (var gi=0; gi<blobGroups.length; gi++) {
+    var group = blobGroups[gi];
+    for (var bi=0; bi<group.length; bi++) for (var bj=bi+1; bj<group.length; bj++) {
+      var a = group[bi], c = group[bj];
+      var dy = Math.abs(a.cy - c.cy), dx = Math.abs(a.cx - c.cx);
+      if (dx <= 0.10*w || dx >= 0.85*w) continue;
+      if (dy > Math.max(14, 0.04*dx)) continue;
+      var L = a.cx < c.cx ? a : c, R = a.cx < c.cx ? c : a;
+      var sim = Math.min(a.size, c.size) / Math.max(a.size, c.size);
+      var centerPen = Math.abs(L.cx - w/2) / w;
+      var botPen = Math.max(0, (Math.max(a.cy, c.cy) - 0.75*h)) / h;
+      var baseScore = sim - (dy/dx)*9.0 - 2.0*centerPen - 3.0*botPen;
+      var calibrated = scoreAnchorPairWithCalibration(L, R, field, orange, w, h, baseScore);
+      if (!calibrated) continue;
+      if (!best || calibrated.score > best.score) {
+        best = {
+          score: calibrated.score,
+          pair_score: baseScore,
+          validation: calibrated,
+          player: L,
+          bolgrot: R
+        };
+      }
+    }
+  }
+  return { best: best, field: field, orange: orange, glyphMask: glyphMask, blobs: blobs };
+}
+
+
+// --- vertical: ratio is the (zoom-invariant) iso constant; Oy anchored on the player foot ---
+// field overlap is computed only as a confidence indicator, NOT to fit the ratio.
+function computeVertical(field, w, h, s, Ox, playerCy){
+  const r = R_ISO;
+  const tileH = 2*s*r;
+  const Oy = (playerCy + FOOT_FRAC*tileH) - 30*s*r;   // player at k=30
+  // confidence: fraction of projected cells landing on detected field
+  let on=0;
+  for (const c of CELLS){
+    const k=c.gx+c.gy, d=c.gx-c.gy;
+    const px=(Ox + d*s)|0, py=(Oy + k*s*r)|0;
+    if (px>=0&&px<w&&py>=0&&py<h&&field[py*w+px]) on++;
+  }
+  return { r, Oy, onFrac: on/CELLS.length };
+}
+
+// --- per-cell enemy classification using the calibrated grid ---
+const PB_CELLS = new Set([PLAYER_CELL.gx+','+PLAYER_CELL.gy, BOLGROT_CELL.gx+','+BOLGROT_CELL.gy]);
+function detectEnemies(orange, w, h, s, Ox, Oy, r){
+  const tileH = 2*s*r;
+  // tight window on the creature body core: excludes neighbours' tile-outline bleed (ghost cells
+  // in dense clusters) while still covering washed/occluded bodies.
+  const hw = 0.26*2*s, hh = 0.34*tileH, ys = 0.28*tileH;
+  const enemies = [];
+  for (const c of CELLS){
+    if (PB_CELLS.has(c.gx+','+c.gy)) continue;
+    const cx = Ox + (c.gx-c.gy)*s;
+    const cy = Oy + (c.gx+c.gy)*s*r - ys;
+    const x0=Math.max(0,(cx-hw)|0), x1=Math.min(w,(cx+hw)|0);
+    const y0=Math.max(0,(cy-hh)|0), y1=Math.min(h,(cy+hh)|0);
+    let cnt=0, tot=0, sx=0, sy=0;
+    for (let y=y0;y<y1;y++){ const base=y*w; for (let x=x0;x<x1;x++){ tot++; if (orange[base+x]){cnt++; sx+=x; sy+=y;} } }
+    if (tot===0) continue;
+    const frac = cnt/tot;
+    if (frac >= ENEMY_THRESH){
+      enemies.push({ gx:c.gx, gy:c.gy, frac, ox:sx/cnt, oy:sy/cnt });
+    }
+  }
+  return enemies;
+}
+function isValidPlayableCell(gx, gy){
+  return gy >= 0 && gy < BOARD_DEF.length && gx >= 0 && gx < BOARD_DEF[gy].length && (BOARD_DEF[gy][gx] === '.' || BOARD_DEF[gy][gx] === 'P');
+}
+function screenToGridApprox(x, y, s, Ox, Oy, r){
+  const d = (x - Ox) / s;
+  const k = (y - Oy) / (s * r);
+  return { gx: Math.round((k + d) / 2), gy: Math.round((k - d) / 2), d, k };
+}
+function detectGlyphs(glyphMask, w, h, s, Ox, Oy, r, enemies){
+  const comps = components(glyphMask, w, h).filter(b =>
+    b.size >= GLYPH_MIN_COMPONENT && b.size <= GLYPH_MAX_COMPONENT &&
+    // Le glyphe le plus haut peut toucher le bord supérieur du screenshot :
+    // on autorise donc y=0, mais on continue de rejeter les composants collés
+    // aux bords gauche/droit/bas, typiques de l'UI ou du décor hors plateau.
+    b.xmin > 1 && b.xmax < w-2 && b.ymax < h-2 &&
+    b.cx>0.08*w && b.cx<0.95*w && b.cy>0.0*h && b.cy<0.95*h
+  );
+  const enemyCells = new Set((enemies || []).map(e => e.gx + ',' + e.gy));
+  const byCell = new Map();
+  for(const b of comps){
+    const g = screenToGridApprox(b.cx, b.cy, s, Ox, Oy, r);
+    if(!isValidPlayableCell(g.gx, g.gy)) continue;
+    const key = g.gx + ',' + g.gy;
+    if(PB_CELLS.has(key) || enemyCells.has(key)) continue;
+    const prev = byCell.get(key);
+    if(!prev || b.size > prev.size){
+      byCell.set(key, { gx:g.gx, gy:g.gy, size:b.size, cx:b.cx, cy:b.cy, raw_d:g.d, raw_k:g.k });
+    }
+  }
+  const glyphs = Array.from(byCell.values()).sort((a,b)=> (a.gy-b.gy) || (a.gx-b.gx));
+  return pruneSplitGlyphArtifacts(glyphs, s);
+}
+
+function analyze(img){
+  return BolgrotCore.analyzeImage(img);
+}
+
+/* ====================================================================
+   OVERLAY (image + projected grid, for visual verification)
+   ==================================================================== */
+const overlayCanvas = document.getElementById('overlayCanvas');
+function renderOverlay(res){
+  const cv = overlayCanvas; cv.width=res.w; cv.height=res.h;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(res.canvas, 0, 0);
+  // projected grid
+  ctx.lineWidth=0.7; ctx.strokeStyle='rgba(125,211,252,0.35)';
+  for (const c of CELLS){
+    const k=c.gx+c.gy, d=c.gx-c.gy;
+    const cx=res.Ox+d*res.s, cy=res.Oy+k*res.s*res.r, hw=res.s, hh=res.s*res.r;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy-hh); ctx.lineTo(cx+hw,cy); ctx.lineTo(cx,cy+hh); ctx.lineTo(cx-hw,cy);
+    ctx.closePath(); ctx.stroke();
+  }
+  const typeLetters = [];
+  const typeLetterKeys = new Set();
+  const addTypeLetter = (cell, letter) => {
+    const key = `${cell.gx},${cell.gy}`;
+    if(!typeLetterKeys.has(key)){
+      typeLetterKeys.add(key);
+      typeLetters.push({cell, letter});
+    }
+  };
+  const drawDiamond = (cell, stroke, fill, lineWidth) => {
+    const cx=res.Ox+(cell.gx-cell.gy)*res.s, cy=res.Oy+(cell.gx+cell.gy)*res.s*res.r, hw=res.s, hh=res.s*res.r;
+    ctx.lineWidth=lineWidth; ctx.strokeStyle=stroke; ctx.fillStyle=fill;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy-hh); ctx.lineTo(cx+hw,cy); ctx.lineTo(cx,cy+hh); ctx.lineTo(cx-hw,cy);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  };
+  // detected enemy cells
+  for (const e of res.enemies || []){
+    drawDiamond(e, '#ef6c1a', 'rgba(239,108,26,0.18)', 2);
+    addTypeLetter(e, 'F');
+  }
+  // detected glyph cells
+  for (const g of (res.glyphs || [])){
+    drawDiamond(g, '#d946ef', 'rgba(126,34,206,0.28)', 2.2);
+    addTypeLetter(g, 'G');
+  }
+  const suspectBadges = [];
+  // cases à vérifier : le jaune est volontairement plus visible que les couleurs
+  // habituelles afin que l’incertitude ne soit jamais silencieuse.
+  for (const s of (res.suspects || [])){
+    const cx=res.Ox+(s.gx-s.gy)*res.s, cy=res.Oy+(s.gx+s.gy)*res.s*res.r, hw=res.s, hh=res.s*res.r;
+    ctx.save();
+    ctx.lineWidth=Math.max(2.5,res.s*0.05); ctx.strokeStyle='#facc15'; ctx.fillStyle=s.kind==='glyph'?'rgba(168,85,247,.14)':'rgba(245,158,11,.14)';
+    ctx.setLineDash([Math.max(5,res.s*.12),Math.max(3,res.s*.06)]);
+    ctx.beginPath();ctx.moveTo(cx,cy-hh);ctx.lineTo(cx+hw,cy);ctx.lineTo(cx,cy+hh);ctx.lineTo(cx-hw,cy);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.restore();
+    addTypeLetter(s, s.kind === 'glyph' ? 'G' : 'F');
+    suspectBadges.push({cx,cy,hw,hh});
+  }
+  // Les lettres sont dessinées après les pointillés jaunes : le type de case reste
+  // immédiatement lisible, y compris dans l'overlay et pour les personnes qui
+  // distinguent mal l'orange et le violet. Elles peuvent être masquées avec le toggle.
+  if(labelsVisible){
+    for(const item of typeLetters){
+      const c=item.cell;
+      const cx=res.Ox+(c.gx-c.gy)*res.s, cy=res.Oy+(c.gx+c.gy)*res.s*res.r;
+      ctx.save();
+      ctx.font=`900 ${Math.max(13,res.s*.29)}px system-ui, sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.lineWidth=Math.max(2,res.s*.035); ctx.strokeStyle='#111827'; ctx.fillStyle='#f8fafc';
+      ctx.strokeText(item.letter,cx,cy+Math.max(1,res.s*.045));
+      ctx.fillText(item.letter,cx,cy+Math.max(1,res.s*.045));
+      ctx.restore();
+    }
+  }
+  for(const badge of suspectBadges){
+    const {cx,cy,hw,hh}=badge;
+    ctx.save();
+    ctx.font=`900 ${Math.max(14,res.s*.30)}px system-ui, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.lineWidth=Math.max(2,res.s*.035);ctx.strokeStyle='#111827';ctx.fillStyle='#fde047';
+    ctx.strokeText('?',cx+hw*.52,cy-hh*.24);ctx.fillText('?',cx+hw*.52,cy-hh*.24);ctx.restore();
+  }
+  // detected blobs
+  const dot=(x,y,col)=>{ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,5,0,7);ctx.fill();};
+  dot(res.player.cx,res.player.cy,'#22d3ee');
+  dot(res.bolgrot.cx,res.bolgrot.cy,'#f97316');
+  // projected anchor cells
+  const cell=(p,col)=>{
+    ctx.strokeStyle=col; ctx.lineWidth=2.5;
+    const hw=res.s,hh=res.s*res.r;
+    ctx.beginPath();
+    ctx.moveTo(p.x,p.y-hh);ctx.lineTo(p.x+hw,p.y);ctx.lineTo(p.x,p.y+hh);ctx.lineTo(p.x-hw,p.y);
+    ctx.closePath(); ctx.stroke();
+  };
+  cell(res.projP,'#22d3ee'); cell(res.projB,'#f97316');
+}
+
+/* ====================================================================
+   UI WIRING
+   ==================================================================== */
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+const consoleMessage=document.getElementById('consoleMessage');
+const alertBanner=document.getElementById('alertBanner');
+const alertBannerText=document.getElementById('alertBannerText');
+const alertBannerClose=document.getElementById('alertBannerClose');
+const resultsEl=document.getElementById('results');
+const tabGrid=document.getElementById('tabGrid');
+const tabImage=document.getElementById('tabImage');
+const toggleLabelsBtn=document.getElementById('toggleLabelsBtn');
+const gridWrap=document.getElementById('gridWrap');
+const overlayWrap=document.getElementById('overlayWrap');
+
+let lastResult=null;
+let originalDetection=null;
+let editMode='fire';
+let hoverCell=null;
+
+function stripHtmlForAlert(html){
+  const tmp = document.createElement('div');
+  tmp.innerHTML = String(html == null ? '' : html);
+  return (tmp.textContent || tmp.innerText || '').trim();
+}
+function hideAlertBanner(){
+  if(alertBanner) alertBanner.classList.add('hidden');
+}
+function showAlertBanner(html){
+  if(!alertBanner || !alertBannerText) return;
+  alertBannerText.innerHTML = html;
+  alertBanner.classList.remove('hidden');
+}
+if(alertBannerClose) alertBannerClose.addEventListener('click', hideAlertBanner);
+function setConsole(html, show=true, level='info'){
+  if(!consoleMessage) return;
+  consoleMessage.classList.remove('warn','alert');
+  if(level === 'warn') consoleMessage.classList.add('warn');
+  if(level === 'alert') consoleMessage.classList.add('alert');
+  else hideAlertBanner();
+  consoleMessage.innerHTML = show ? html : '';
+}
+function alertConsole(html, alertText){
+  const msg = html || escHtml(alertText || 'Alerte');
+  setConsole(msg, true, 'alert');
+  showAlertBanner(msg);
+}
+function warnConsole(html){ setConsole(html, true, 'warn'); }
+function setStatus(html, show=true){ setConsole(html, show); }
+function hidePreImportSolverNotice(){ if(preImportSolverNotice) preImportSolverNotice.classList.add('hidden'); }
+function fmt(n,d=1){ return (typeof n==='number' && isFinite(n)) ? n.toFixed(d) : '—'; }
+
+function clonePlainCells(arr){ return (arr || []).map(o => Object.assign({}, o)); }
+function snapshotDetection(res){ return res ? { enemies: clonePlainCells(res.enemies), glyphs: clonePlainCells(res.glyphs || []), suspects: clonePlainCells(res.suspects || []) } : null; }
+function refreshReviewState(){
+  if(!lastResult) return;
+  const blockers = lastResult.review && Array.isArray(lastResult.review.blockers) ? lastResult.review.blockers.slice() : [];
+  const suspects = lastResult.suspects || [];
+  const quality = blockers.length ? 'blocked' : (suspects.length ? 'review' : 'ok');
+  lastResult.quality = quality;
+  lastResult.review = { quality, blockers, requiresReview: suspects.length > 0 };
+}
+function clearSuspectAt(c){
+  if(!lastResult || !Array.isArray(lastResult.suspects)) return;
+  lastResult.suspects = lastResult.suspects.filter(s => !(s.gx===c[0] && s.gy===c[1]));
+  refreshReviewState();
+}
+function restoreOriginalDetection(){
+  if(!lastResult || !originalDetection) return;
+  lastResult.enemies = clonePlainCells(originalDetection.enemies);
+  lastResult.glyphs = clonePlainCells(originalDetection.glyphs);
+  lastResult.suspects = clonePlainCells(originalDetection.suspects || []);
+  refreshReviewState();
+  renderDetectedState('Détection réinitialisée.');
+}
+function updateSuspectDefaultNotice(){
+  const count = lastResult && Array.isArray(lastResult.suspects) ? lastResult.suspects.length : 0;
+  if(!suspectDefaultNotice) return;
+  const shouldShow = workflowPhase === 'detected' && count > 0;
+  suspectDefaultNotice.classList.toggle('hidden', !shouldShow);
+  if(shouldShow){
+    const plural = count > 1 ? 's' : '';
+    suspectDefaultNotice.innerHTML = '<strong>Attention :</strong> '+count+' case'+plural+' jaune'+plural+' restante'+plural+' '+(count > 1 ? 'seront' : 'sera')+' considérée'+(count > 1 ? 's' : '')+' comme <strong>vide'+(count > 1 ? 's' : '')+'</strong> si tu cliques sur « Résoudre » sans '+(count > 1 ? 'les' : 'la')+' corriger.';
+  }
+}
+function updateEditorCounts(){
+  const f=document.getElementById('editFireCount'), g=document.getElementById('editGlyphCount');
+  if(f) f.textContent = lastResult && lastResult.enemies ? String(lastResult.enemies.length) : '—';
+  if(g) g.textContent = lastResult && lastResult.glyphs ? String(lastResult.glyphs.length) : '—';
+  updateSuspectDefaultNotice();
+}
+function setEditMode(mode){
+  editMode = mode === 'glyph' ? 'glyph' : (mode === 'empty' ? 'empty' : 'fire');
+  const fire=document.getElementById('editFireBtn'), glyph=document.getElementById('editGlyphBtn'), empty=document.getElementById('editEmptyBtn');
+  if(fire) fire.classList.toggle('active', editMode === 'fire');
+  if(glyph) glyph.classList.toggle('active', editMode === 'glyph');
+  if(empty) empty.classList.toggle('active', editMode === 'empty');
+}
+function renderDetectedState(message){
+  if(!lastResult) return;
+  renderGrid();
+  for (const e of lastResult.enemies || []) placeEnemy(e);
+  for (const g of (lastResult.glyphs || [])) placeGlyph(g);
+  for (const s of (lastResult.suspects || [])) placeSuspect(s);
+  placeMarker(PLAYER_CELL, '#22d3ee', 'Joueur 15/15');
+  placeMarker(BOLGROT_CELL, '#f97316', 'Bolgrot 20/10');
+  redrawHoverCell();
+  showResults(lastResult);
+  renderOverlay(lastResult);
+  updateEditorCounts();
+  refreshDetectionHint(false);
+  if(message) setConsole(message);
+}
+function detectionMessageHtml(res){
+  if(!res) return 'Aucun screenshot chargé pour le moment.';
+  const enemies = res.enemies ? res.enemies.length : 0;
+  const glyphs = res.glyphs ? res.glyphs.length : 0;
+  const suspects = (res.suspects || []).length;
+  const issues = detectionIssues(res, 't6');
+  if(res.quality === 'blocked'){
+    return '<strong>Détection non fiable :</strong> '+escHtml(issues.join(', '))+'. Le solveur reste bloqué : importe un screenshot plus complet.';
+  }
+  if(issues.length){
+    const review = suspects ? ' Les '+suspects+' case(s) en pointillé jaune avec « ? » doivent être confirmées comme Feu, Glyphe ou Vide.' : '';
+    return '<strong>À vérifier :</strong> '+enemies+' feux et '+glyphs+' glyphe(s) confirmés ('+escHtml(issues.join(', '))+').'+review+' La vue “Image + overlay” aide à contrôler le recalage.';
+  }
+  return '<strong>Screenshot T6 chargé.</strong> '+enemies+' feux et '+glyphs+' glyphe(s) détectés, sans incertitude signalée.';
+}
+function refreshDetectionHint(alertIfSuspect){
+  if(!lastResult) return;
+  const issues = detectionIssues(lastResult, 't6');
+  const weak = issues.length > 0;
+  const html = detectionMessageHtml(lastResult);
+  if(detectionHint){
+    detectionHint.classList.toggle('warn', weak);
+    detectionHint.innerHTML = html;
+  }
+  if(alertIfSuspect && weak) alertConsole(html, 'Détection suspecte : '+issues.join(', ')+'. Vérifie la grille ou l’overlay avant de continuer.');
+  else if(alertIfSuspect) setConsole(html);
+  else updateEditorCounts();
+}
+function showResults(res){
+  resultsEl.classList.remove('hidden');
+  const f = 1/res.scale; // back to original-image pixels for display
+  const conf = res.onFrac;
+  let cls='bad', txt='faible';
+  if(res.quality === 'blocked'){ cls='bad'; txt='bloquée'; }
+  else if(res.quality === 'review'){ cls='warn'; txt='à vérifier'; }
+  else if(conf>0.7){cls='ok';txt='bonne';} else if(conf>0.45){cls='warn';txt='moyenne';}
+  document.getElementById('rConf').innerHTML = `<span class="pill ${cls}">${txt}</span>`;
+  document.getElementById('rEnemies').innerHTML = `${res.enemies.length} · écart ${fmt(res.meanDev,1)} px`;
+  document.getElementById('rGlyphs').innerHTML = `${(res.glyphs||[]).length}`;
+  const sus=document.getElementById('rSuspects'); if(sus) sus.textContent = `${(res.suspects||[]).length} case(s) jaune(s)`;
+  document.getElementById('rPlayer').textContent  = `${(res.player.cx*f)|0}, ${(res.player.cy*f)|0}`;
+  document.getElementById('rBolgrot').textContent = `${(res.bolgrot.cx*f)|0}, ${(res.bolgrot.cy*f)|0}`;
+  document.getElementById('rTile').textContent    = `${fmt(2*res.s*f,0)} px`;
+  document.getElementById('rRatio').textContent   = fmt(res.r,3);
+  document.getElementById('rIou').textContent     = `${fmt(res.onFrac*100,0)}%`;
+  document.getElementById('rResid').textContent   = `${fmt(res.resid*f,1)} px`;
+}
+
+function handleImage(img){
+  hidePreImportSolverNotice();
+  setStatus(`<span class="spinner"></span>Analyse…`);
+  // let the spinner paint before the (sync) heavy work
+  setTimeout(()=>{
+    let res;
+    try { res = analyze(img); }
+    catch(e){ alertConsole(`<strong>Erreur technique pendant l’analyse :</strong> ${escHtml(e.message || e)}`, 'Erreur technique pendant l’analyse du screenshot.'); return; }
+    if (!res.ok){
+      alertConsole(`<strong>Screenshot invalide :</strong> joueur ou Bolgrot non détecté (${escHtml(res.reason)}). Vérifie que la fenêtre entière de Dofus est visible.`, 'Screenshot invalide : le joueur ou Bolgrot n’a pas été détecté. Vérifie que la fenêtre entière de Dofus est visible.');
+      return;
+    }
+    lastResult=res;
+    originalDetection=snapshotDetection(res);
+    startTurn.value = 6;
+    startPv.value = 40;
+    resetWorkflowForNewScreenshot();
+    renderDetectedState();
+    refreshDetectionHint(true);
+    if(solveBtn) solveBtn.disabled = res.quality === 'blocked';
+    const editor = document.getElementById('t5Editor'); if(editor) editor.classList.remove('hidden');
+    if(detectionLegend) detectionLegend.classList.remove('hidden');
+    tabImage.disabled=false;
+    switchView(false);
+    if(solverBox) solverBox.classList.remove('hidden');
+  }, 30);
+}
+
+function isImageClipboardOrFile(file){
+  if(!file) return false;
+  if(file.type && file.type.startsWith('image/')) return true;
+  return /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name || '');
+}
+function loadFile(file){
+  if (!isImageClipboardOrFile(file)){ alertConsole('<strong>Fichier non supporté.</strong> Importe une image de screenshot.', 'Fichier non supporté. Importe une image de screenshot.'); return; }
+  const img=new Image();
+  const url = URL.createObjectURL(file);
+  img.onload=()=>{ URL.revokeObjectURL(url); handleImage(img); };
+  img.onerror=()=>{ URL.revokeObjectURL(url); alertConsole('<strong>Impossible de charger l’image.</strong>', 'Impossible de charger l’image.'); };
+  img.src=url;
+}
+function findClipboardImageFile(clipboardData){
+  if(!clipboardData) return null;
+  const items = Array.from(clipboardData.items || []);
+  for(const item of items){
+    if(item.kind === 'file' && item.type && item.type.startsWith('image/')){
+      const file = item.getAsFile();
+      if(file) return file;
+    }
+  }
+  const files = Array.from(clipboardData.files || []);
+  return files.find(isImageClipboardOrFile) || null;
+}
+function flashDropZone(){
+  if(!dropZone) return;
+  dropZone.classList.add('dragover');
+  setTimeout(()=>dropZone.classList.remove('dragover'), 450);
+}
+function handlePasteImage(e){
+  const file = findClipboardImageFile(e.clipboardData);
+  if(!file) return;
+  e.preventDefault();
+  flashDropZone();
+  setConsole('<span class="spinner"></span>Image collée depuis le presse-papiers…');
+  loadFile(file);
+}
+
+dropZone.addEventListener('click', ()=>fileInput.click());
+fileInput.addEventListener('change', e=>{ if(e.target.files[0]) loadFile(e.target.files[0]); });
+['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault();dropZone.classList.add('dragover');}));
+['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault();dropZone.classList.remove('dragover');}));
+dropZone.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) loadFile(f); });
+// allow dropping anywhere on the board too
+document.querySelector('main.panel').addEventListener('dragover',e=>e.preventDefault());
+document.querySelector('main.panel').addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)loadFile(f);});
+document.addEventListener('paste', handlePasteImage);
+
+function switchView(toImage){
+  tabGrid.classList.toggle('active',!toImage);
+  tabImage.classList.toggle('active',toImage);
+  gridWrap.style.display = toImage ? 'none':'block';
+  overlayWrap.style.display = toImage ? 'flex':'none';
+}
+function setLabelsVisible(next){
+  labelsVisible = !!next;
+  if(toggleLabelsBtn){
+    toggleLabelsBtn.classList.toggle('active', labelsVisible);
+    toggleLabelsBtn.setAttribute('aria-pressed', labelsVisible ? 'true' : 'false');
+    toggleLabelsBtn.textContent = labelsVisible ? 'Labels : ON' : 'Labels : OFF';
+    toggleLabelsBtn.title = labelsVisible ? 'Masquer les lettres F et G sur les cases' : 'Afficher les lettres F et G sur les cases';
+  }
+  if(steps && workflowPhase !== 'detected' && workflowPhase !== 'idle') renderStep(curStep);
+  else if(lastResult) renderDetectedState();
+}
+tabGrid.addEventListener('click',()=>switchView(false));
+tabImage.addEventListener('click',()=>{ if(!tabImage.disabled) switchView(true); });
+if(toggleLabelsBtn) toggleLabelsBtn.addEventListener('click',()=>setLabelsVisible(!labelsVisible));
+
+/* ====================================================================
+   SOLVEUR — worker Blob + rendu pas-à-pas du plan sur la grille iso
+   ==================================================================== */
+const solverBox   = document.getElementById('solverBox');
+const startTurn   = document.getElementById('startTurn');
+const startPv     = document.getElementById('startPv');
+const timeBudgetS = document.getElementById('timeBudgetS');
+const solveBtn    = document.getElementById('solveBtn');
+const preImportSolverNotice = document.getElementById('preImportSolverNotice');
+const debugPanel = document.getElementById('debugPanel');
+const exportPlanBtn = document.getElementById('exportPlanBtn');
+const solveSummary= document.getElementById('solveSummary');
+const portfolioBox= document.getElementById('portfolioBox');
+const stepNav     = document.getElementById('stepNav');
+const t5WorkflowBox = document.getElementById('t5WorkflowBox');
+const t5WorkflowStatus = document.getElementById('t5WorkflowStatus');
+const enterSyncBtn = document.getElementById('enterSyncBtn');
+const syncControls = document.getElementById('syncControls');
+const syncGlyphCount = document.getElementById('syncGlyphCount');
+const syncFireCount = document.getElementById('syncFireCount');
+const clearT6GlyphsBtn = document.getElementById('clearT6GlyphsBtn');
+const resolveFromT6Btn = document.getElementById('resolveFromT6Btn');
+
+let _workerURL = null;
+function getWorkerURL(){
+  if(!_workerURL){
+    const workerVersion = 'v64_adl_loa_auto_portfolio';
+    const coreFiles = ["bolgrot_rules.js", "bolgrot_strategies.js", "bolgrot_solver_engine.js", "bolgrot_weight_profiles.js", "bolgrot_detection.js"];
+    const coreUrls = coreFiles.map(f => { const u = new URL(f, window.location.href); u.searchParams.set('v', workerVersion); return u.href; });
+    const apiUrlObj = new URL("bolgrot_api.js", window.location.href); apiUrlObj.searchParams.set('v', workerVersion);
+    const apiUrl = apiUrlObj.href;
+    const compat = window.__BOLGROT_API_COMPAT_SHIM_SOURCE || '';
+    // Phase A wasm : URL du module fln.wasm (servi à côté des autres fichiers)
+    const wasmUrlObj = new URL("fln.wasm", window.location.href); wasmUrlObj.searchParams.set('v', workerVersion);
+    const wasmUrl = wasmUrlObj.href;
+    // Loader exécuté dans le worker : instancie fln.wasm une fois et publie la glue
+    // mémoire utilisée par fireLineMetrics (rules.js). Repli JS automatique si échec.
+    const flnLoader =
+      'self.__FLN_WASM_URL=' + JSON.stringify(wasmUrl) + ';\n' +
+      'self.__ensureFlnWasm=function(){' +
+      ' if(self.__flnPromise) return self.__flnPromise;' +
+      ' if(!self.__FLN_WASM_URL||typeof WebAssembly==="undefined"){self.__flnPromise=Promise.resolve(false);return self.__flnPromise;}' +
+      ' self.__flnPromise=fetch(self.__FLN_WASM_URL).then(function(r){return r.arrayBuffer();})' +
+      '  .then(function(b){return WebAssembly.instantiate(b,{env:{abort:function(){}}});})' +
+      '  .then(function(res){var ex=res.instance.exports;self.__FLN=ex;' +
+      '   self.__FLN_MEM_I32=new Int32Array(ex.memory.buffer);self.__FLN_MEM_U8=new Uint8Array(ex.memory.buffer);' +
+      '   self.__FLN_MEM_F64=new Float64Array(ex.memory.buffer);' +
+      '   self.__FLN_ENEM_I32=ex.enemiesPtr()>>2;self.__FLN_OUT_I32=ex.outPtr()>>2;self.__FLN_BLOCKED_PTR=ex.blockedPtr();' +
+      '   if(ex.afAnglesPtr){self.__FLN_AANG_OFF=ex.afAnglesPtr()>>3;self.__FLN_AOUT_I32=ex.afOutPtr()>>2;}' +
+      '   self.__FLN_READY=true;return true;})' +
+      '  .catch(function(e){self.__FLN_READY=false;return false;});' +
+      ' return self.__flnPromise;};' +
+      'try{self.__ensureFlnWasm();}catch(_e){}';
+    const src = 'importScripts(' + coreUrls.map(u => JSON.stringify(u)).join(',') + ');\n' + compat + '\nimportScripts(' + JSON.stringify(apiUrl) + ');\n' + flnLoader + '\ntry{ self.postMessage({type:"ready"}); }catch(_e){}';
+    _workerURL = URL.createObjectURL(new Blob([src],{type:'application/javascript'}));
+  }
+  return _workerURL;
+}
+function solveBolgrotLocal(payload){
+  return new Promise((resolve,reject)=>{
+    const w = new Worker(getWorkerURL());
+    const hardTimeout = Math.max(15000, Math.min(240000, (payload.timeBudgetMs || 20000) + 15000));
+    const timer = setTimeout(()=>{ w.terminate(); reject(new Error('Timeout solveur ('+Math.round(hardTimeout/1000)+' s)')); }, hardTimeout);
+    w.onmessage = (e)=>{
+      const m = e.data || {};
+      if(m.type==='ready'){ return; }
+      if(m.type==='result'){ clearTimeout(timer); w.terminate(); resolve(m.body); }
+      else if(m.type==='error'){ clearTimeout(timer); w.terminate(); reject(new Error(m.message)); }
+    };
+    w.onerror = (err)=>{ clearTimeout(timer); w.terminate(); reject(new Error(err.message||'erreur worker')); };
+    w.postMessage({ type:'solve', payload });
+  });
+}
+function setSolveStatus(html, show=true){ setConsole(html, show); }
+
+
+/* ====================================================================
+   PROFILS SOLVEUR — ADL principal + LOA secours (profils.json)
+   ==================================================================== */
+const SOLVER_PROFILES_URL = 'profils.json';
+const SOLVER_PROFILE_IDS = {
+  adl: 'anti_density_line',
+  loa: 'beam_clean_v47_weights_line_optimized_a'
+};
+const AUTO_PORTFOLIO_PARALLEL_MIN_CORES = 6;
+const LOA_PROFILE_FALLBACK = {
+  "id": "beam_clean_v47_weights_line_optimized_a",
+  "name": "Line Optimized A",
+  "label": "Beam Clean V49.1 · Line Optimized A",
+  "description": "Profil promu proprement depuis l’optimiseur V49.1. Source : V48 mutation 018 · V48 mutation 041 · V48 mutation 015 · V47 JSON · line strong seed",
+  "weights": {
+    "enemies": -955,
+    "pv": 262,
+    "mobility": 992,
+    "safeLandings": 163,
+    "maxLineRay": 9584,
+    "maxLineGlobal": 3680,
+    "alignment": 70,
+    "densityOver2": -11157,
+    "adjacentDensity": -12171,
+    "killTargets": 752,
+    "primaryClaims": -1142
+  },
+  "thresholds": [
+    { "feature": "maxLineRay", "gte": 4, "value": 9030 },
+    { "feature": "maxLineRay", "gte": 6, "value": 21264 },
+    { "feature": "maxLineRay", "gte": 8, "value": 37336 },
+    { "feature": "maxLineRay", "gte": 10, "value": 12339 }
+  ],
+  "scale": 0.976,
+  "beamWidthMultiplier": 1.101,
+  "diversityEliteRatio": 0.513,
+  "v38LaneProfile": "line",
+  "v38ProbeTopN": null
+};
+const ADL_PROFILE_FALLBACK = {
+  "id": "anti_density_line",
+  "name": "Anti Density Line",
+  "label": "ADL",
+  "description": "Profil ADL intégré en secours si profils.json est absent ou incomplet.",
+  "weights": {
+    "enemies": -1506,
+    "pv": 410,
+    "mobility": 2072,
+    "safeLandings": 1211,
+    "maxLineRay": 8167,
+    "maxLineGlobal": 3715,
+    "alignment": 174,
+    "densityOver2": -49814,
+    "adjacentDensity": -10610,
+    "killTargets": 733,
+    "primaryClaims": -2842
+  },
+  "thresholds": [
+    { "feature": "maxLineRay", "gte": 5, "value": 18110 },
+    { "feature": "maxLineRay", "gte": 7, "value": 22912 },
+    { "feature": "densityOver2", "gte": 4, "value": -28127 },
+    { "feature": "adjacentDensity", "gte": 2, "value": -10380 }
+  ],
+  "scale": 1.108,
+  "beamWidthMultiplier": 0.994,
+  "diversityEliteRatio": 0.528,
+  "v38LaneProfile": "line",
+  "v38ProbeTopN": null
+};
+let solverProfiles = null;
+let solverProfilesLoadPromise = null;
+
+function clampBeamWidth(v){
+  return Math.max(500, Math.min(5000, Math.round(Number(v) || 1500)));
+}
+function normalizeSolverProfile(raw, fallback){
+  const src = raw || fallback;
+  if(!src || !src.weights) throw new Error('profils.json ne contient pas de profil de poids valide.');
+  const numOr = (v, fallbackValue) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallbackValue;
+  };
+  const probeTopN = (src.v38ProbeTopN === null || src.v38ProbeTopN === undefined || src.v38ProbeTopN === '')
+    ? null
+    : numOr(src.v38ProbeTopN, null);
+  return {
+    id: src.id || (fallback && fallback.id) || 'beam_clean_v47_weights_profile',
+    name: src.name || (fallback && fallback.name) || 'Profil de poids',
+    label: src.label || (fallback && fallback.label) || src.name || 'Profil de poids',
+    description: src.description || '',
+    weights: Object.assign({}, src.weights),
+    thresholds: Array.isArray(src.thresholds) ? src.thresholds.map(t => Object.assign({}, t)) : [],
+    scale: numOr(src.scale, fallback && fallback.scale != null ? fallback.scale : 1),
+    beamWidthMultiplier: numOr(src.beamWidthMultiplier, fallback && fallback.beamWidthMultiplier != null ? fallback.beamWidthMultiplier : 1),
+    diversityEliteRatio: numOr(src.diversityEliteRatio, fallback && fallback.diversityEliteRatio != null ? fallback.diversityEliteRatio : 0.65),
+    v38LaneProfile: src.v38LaneProfile || (fallback && fallback.v38LaneProfile) || 'line',
+    v38ProbeTopN: probeTopN,
+  };
+}
+function findProfileByIdentity(list, wanted){
+  const tokens = Array.isArray(wanted) ? wanted : [wanted];
+  const lowers = tokens.map(v => String(v || '').toLowerCase()).filter(Boolean);
+  return (list || []).find(p => {
+    const fields = [p && p.id, p && p.name, p && p.label].map(v => String(v || '').toLowerCase());
+    return lowers.some(tok => fields.some(f => f === tok || f.indexOf(tok) >= 0));
+  });
+}
+function normalizeProfilesBundle(raw){
+  const arr = raw && Array.isArray(raw.profiles) ? raw.profiles : (Array.isArray(raw) ? raw : []);
+  const loaRaw = findProfileByIdentity(arr, [SOLVER_PROFILE_IDS.loa, 'Line Optimized A', 'LOA']);
+  const adlRaw = findProfileByIdentity(arr, [SOLVER_PROFILE_IDS.adl, 'Anti Density Line', 'ADL']);
+  return {
+    source: raw && raw.export_version ? raw.export_version : 'profils.json',
+    adl: normalizeSolverProfile(adlRaw, ADL_PROFILE_FALLBACK),
+    loa: normalizeSolverProfile(loaRaw, LOA_PROFILE_FALLBACK),
+  };
+}
+async function loadSolverProfiles(){
+  if(solverProfiles) return solverProfiles;
+  if(!solverProfilesLoadPromise){
+    solverProfilesLoadPromise = (async()=>{
+      try{
+        const url = new URL(SOLVER_PROFILES_URL, window.location.href).href;
+        const res = await fetch(url, { cache:'no-store' });
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        solverProfiles = normalizeProfilesBundle(await res.json());
+      }catch(err){
+        console.warn('Impossible de charger profils.json ; utilisation des profils intégrés ADL + LOA.', err);
+        solverProfiles = normalizeProfilesBundle({ profiles:[ADL_PROFILE_FALLBACK, LOA_PROFILE_FALLBACK] });
+      }
+      return solverProfiles;
+    })();
+  }
+  return solverProfilesLoadPromise;
+}
+function activeSolverProfiles(){
+  return solverProfiles || normalizeProfilesBundle({ profiles:[ADL_PROFILE_FALLBACK, LOA_PROFILE_FALLBACK] });
+}
+function activeADLProfile(){ return activeSolverProfiles().adl; }
+function activeLoAProfile(){ return activeSolverProfiles().loa; }
+function activePrimaryProfile(){ return activeADLProfile(); }
+function activeFallbackProfile(){ return activeLoAProfile(); }
+function profileDisplayLabel(profile){ return (profile && (profile.label || profile.name || profile.id)) || 'profil'; }
+function isParallelPortfolioAvailable(){
+  const cores = Number(navigator.hardwareConcurrency || 1);
+  return Number.isFinite(cores) && cores >= AUTO_PORTFOLIO_PARALLEL_MIN_CORES;
+}
+function autoPortfolioModeLabel(){
+  return isParallelPortfolioAvailable() ? 'ADL + LOA parallèle automatique' : 'ADL puis LOA en secours automatique';
+}
+function adaptiveBeamScheduleForBase(baseBeamWidth){
+  const base = clampBeamWidth(baseBeamWidth);
+  // Schedule progressive par défaut : garde les gains des petits beams sur les
+  // cas faciles, mais laisse un vrai plafond aux scénarios difficiles.
+  const seeds = [100, 300, 600, 1000, 1600, 2500, 3500, base];
+  const out = [];
+  for(const raw of seeds){
+    const v = Math.max(50, Math.min(base, Math.round(Number(raw) || 0)));
+    if(v > 0 && !out.includes(v)) out.push(v);
+  }
+  out.sort((a,b)=>a-b);
+  return out;
+}
+function adaptiveSecondaryBeamScheduleForBase(baseBeamWidth){
+  const base = clampBeamWidth(baseBeamWidth);
+  const seeds = [100, 300, 600, 1000, 1600, 2500, 3500, base];
+  const out = [];
+  for(const raw of seeds){
+    const v = Math.max(50, Math.min(base, Math.round(Number(raw) || 0)));
+    if(v > 0 && !out.includes(v)) out.push(v);
+  }
+  out.sort((a,b)=>a-b);
+  return out;
+}
+function applySolverProfileToPayload(payload, requestedBeamWidth, profile, role){
+  profile = normalizeSolverProfile(profile, role === 'fallback' ? LOA_PROFILE_FALLBACK : ADL_PROFILE_FALLBACK);
+  const baseBeamWidth = clampBeamWidth(requestedBeamWidth);
+  const adaptiveSchedule = adaptiveBeamScheduleForBase(baseBeamWidth);
+  const adaptiveSecondarySchedule = adaptiveSecondaryBeamScheduleForBase(baseBeamWidth);
+  Object.assign(payload, {
+    // V56 : adaptation faite dans le moteur, pas par relance de worker.
+    // Le beam affiché/requis reste le beam de base ; bolgrot_weight_profiles.js
+    // applique ensuite beamWidthMultiplier au profil actif et à la schedule.
+    beamWidth: baseBeamWidth,
+    requestedBeamWidth: baseBeamWidth,
+    solverProfileId: profile.id,
+    solverProfileName: profile.name,
+    solverProfileLabel: profile.label,
+    solverProfileRole: role || 'primary',
+    solverProfile: profile,
+
+    strategyIds: ['beam_clean_v47_weights_adaptive'],
+    enabledStrategyIds: ['beam_clean_v47_weights_adaptive'],
+    enableV47WeightProfiles: false,
+    v47WeightProfilesEnabled: false,
+    enableV56AdaptiveBeam: true,
+    v56AdaptiveBeam: true,
+    adaptiveBeam: true,
+    adaptiveBeamSchedule: adaptiveSchedule.slice(),
+    v56AdaptiveBeamSchedule: adaptiveSchedule.slice(),
+    v56AdaptiveSecondaryBeamSchedule: adaptiveSecondarySchedule.slice(),
+    adaptiveFallbackPolicy: 'late',
+    v56AdaptiveFallbackPolicy: 'late',
+    v47WeightProfiles: [profile],
+    v47WeightProfileCount: 1,
+    strategyBudgetMode: 'per_strategy',
+
+    // Paramètres communs au benchmark. Le profil garde v38ProbeTopN:null ; le
+    // moteur retombe alors sur ce v38ProbeTopN global, comme dans le Monte Carlo.
+    v38ProbeTopN: profile.v38ProbeTopN != null ? profile.v38ProbeTopN : 120,
+    diversityEnabled: true,
+  });
+  return payload;
+}
+function applyLoAProfileToPayload(payload, requestedBeamWidth){
+  return applySolverProfileToPayload(payload, requestedBeamWidth, activeLoAProfile(), 'fallback');
+}
+
+
+let solveResult=null, steps=null, curStep=0;
+let lastSolvePayload=null, lastSolveMs=null;
+let workflowPhase='idle';
+let phase1FullSteps=null;
+let phase1PassIndex=-1;
+let syncState=null;
+let manualT6Glyphs=[];
+let finalSolveResult=null;
+let t6GlyphOverflowAlerted=false;
+let autoTimer=null;
+let solveTimer=null;
+let lastVisiblePlanKind='';
+
+const phaseEls = {
+  import: document.getElementById('phaseImport'),
+  steps: document.getElementById('phaseSteps'),
+  sync: document.getElementById('phaseSync'),
+};
+const stepsTitle = document.getElementById('stepsTitle');
+const stepsHint = document.getElementById('stepsHint');
+const actionsList = document.getElementById('actionsList');
+const copyPlanBtn = document.getElementById('copyPlanBtn');
+const autoPlayBtn = document.getElementById('autoPlayBtn');
+const stepDelayS = document.getElementById('stepDelayS');
+const backToSyncBtn = document.getElementById('backToSyncBtn');
+const precisionValue = document.getElementById('precisionValue');
+const detectionHint = document.getElementById('detectionHint');
+const restartBtn = document.getElementById('restartBtn');
+const openTutorialBtn = document.getElementById('openTutorialBtn');
+const tutorialBox = document.getElementById('tutorialBox');
+const t5Editor = document.getElementById('t5Editor');
+const detectionLegend = document.getElementById('detectionLegend');
+const suspectDefaultNotice = document.getElementById('suspectDefaultNotice');
+const editFireBtn = document.getElementById('editFireBtn');
+const editGlyphBtn = document.getElementById('editGlyphBtn');
+const editEmptyBtn = document.getElementById('editEmptyBtn');
+const resetDetectionBtn = document.getElementById('resetDetectionBtn');
+
+function showPhase(name){
+  Object.entries(phaseEls).forEach(([k,el]) => { if(el) el.classList.toggle('active', k===name || (name==='t5'&&k==='steps') || (name==='t6'&&k==='steps')); });
+}
+function isWinResult(res){ return !!res && (res.reason === 'ok' || res.reason === 'goal_reached'); }
+function isEndActionStep(st){ return !!(st && st.action_raw && st.action_raw.kind === 'end'); }
+function isCurrentNextEnd(){ return !!(steps && steps[curStep+1] && isEndActionStep(steps[curStep+1])); }
+function detectionIssues(res, phase='t6'){
+  if(!res) return ['aucune analyse disponible'];
+  const enemies = res.enemies ? res.enemies.length : 0;
+  const glyphs = res.glyphs ? res.glyphs.length : 0;
+  const suspects = (res.suspects || []).length;
+  const issues = [];
+  if(res.review && Array.isArray(res.review.blockers)) issues.push(...res.review.blockers);
+  if(res.onFrac < 0.45) issues.push('confiance générale faible');
+  if(enemies < 24 || enemies > 36) issues.push(enemies+' feux confirmés');
+  if(glyphs < 0 || glyphs > 6) issues.push(glyphs+' glyphes confirmés');
+  if(suspects) issues.push(suspects+' case(s) à vérifier');
+  return [...new Set(issues)];
+}
+function hasSuspiciousDetection(){ return detectionIssues(lastResult, 't6').length > 0; }
+function simpleDetectionMessage(res){
+  if(!res) return;
+  refreshDetectionHint(true);
+  const issues = detectionIssues(res, 't6');
+  if(!issues.length) setConsole(detectionMessageHtml(res));
+}
+function showNoSolution(where){
+  stopAutoPlay();
+  if(exportPlanBtn) exportPlanBtn.classList.remove('hidden');
+  if(copyPlanBtn) copyPlanBtn.classList.add('hidden');
+  const msg = 'Pas de solution trouvée';
+  const suspicious = hasSuspiciousDetection();
+  const advice = suspicious
+    ? 'La détection du screenshot est suspecte : vérifie la grille ou l’overlay avant de conclure.'
+    : 'Vérifie/corrige la détection ou augmente le plafond de complexité dans les options avancées.';
+  alertConsole('<strong>'+msg+'.</strong> '+advice, msg+'. '+advice);
+  showPhase('import');
+  if(t5Editor) t5Editor.classList.remove('hidden');
+  if(detectionLegend) detectionLegend.classList.remove('hidden');
+  updateSuspectDefaultNotice();
+}
+function handleSolveException(err){
+  if(exportPlanBtn && lastSolvePayload) exportPlanBtn.classList.remove('hidden');
+  const raw = String((err && err.message) || err || 'erreur inconnue');
+  console.error('Erreur solveur Bolgrot:', raw, err);
+  if(/Timeout solveur/i.test(raw)){
+    alertConsole('<strong>Le solveur a pris trop de temps.</strong> Recharge la page et réessaie.', 'Le solveur a pris trop de temps. Recharge la page et réessaie.');
+  } else {
+    alertConsole('<strong>Une erreur est survenue pendant la résolution.</strong> Recharge la page et réessaie.', 'Une erreur est survenue pendant la résolution. Recharge la page et réessaie.');
+  }
+}
+function currentStateLabel(){ return ''; }
+function displayActionText(action){
+  const raw = String(action == null || action === '' ? '—' : action);
+  const cleaned = raw
+    .replace(/\s*(?:→|->)\s*\(-?\d+\s*,\s*-?\d+\)\s*/g, ' ')
+    .replace(/\s+\(-?\d+\s*,\s*-?\d+\)\s*$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return cleaned || raw;
+}
+function actionPlainText(st, idx){ return idx+'. '+displayActionText(st && st.action ? st.action : '—'); }
+function planText(){
+  if(!steps || steps.length<=1) return 'Aucun plan disponible.';
+  const title = 'Plan depuis T6';
+  return title+'\n'+steps.slice(1).map((st,i)=>actionPlainText(st,i+1)).join('\n');
+}
+async function copyVisiblePlan(){
+  const txt = planText();
+  try{
+    if(navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(txt);
+    else {
+      const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    setSolveStatus('Plan copié dans le presse-papiers.');
+  }catch(e){
+    setSolveStatus('Impossible de copier automatiquement. Le plan est affiché dans la liste des actions.');
+  }
+}
+function formatSolveTime(ms){
+  const s = Math.max(0, ms / 1000);
+  return (s >= 10 ? s.toFixed(0) : s.toFixed(1)).replace('.', ',')+' s';
+}
+function stopSolveTimer(){
+  if(solveTimer){ clearInterval(solveTimer); solveTimer=null; }
+}
+function solveStatusPhase(elapsedMs){
+  const s = elapsedMs / 1000;
+  if(s >= 30) return 3;
+  if(s >= 15) return 2;
+  if(s >= 6) return 1;
+  return 0;
+}
+function startSolveTimer(){
+  stopSolveTimer();
+  const t0 = performance.now();
+  setSolveStatus('<span class="spinner"></span><span id="solveProgressText" class="solving-progress-text phase-0">Recherche en cours… <span id="solveElapsed" class="solving-time">0,0 s écoulées</span></span>');
+  const tick = ()=>{
+    const elapsed = performance.now() - t0;
+    const elapsedEl = document.getElementById('solveElapsed');
+    if(elapsedEl) elapsedEl.textContent = formatSolveTime(elapsed) + ' écoulées';
+    const progressEl = document.getElementById('solveProgressText');
+    if(progressEl){
+      const phase = solveStatusPhase(elapsed);
+      progressEl.classList.remove('phase-0','phase-1','phase-2','phase-3');
+      progressEl.classList.add('phase-'+phase);
+    }
+  };
+  tick();
+  solveTimer = setInterval(tick, 250);
+}
+function stopAutoPlay(){
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  if(autoPlayBtn) autoPlayBtn.textContent = 'Auto play';
+}
+function toggleAutoPlay(){
+  if(autoTimer){ stopAutoPlay(); return; }
+  if(!steps || curStep >= steps.length-1) return;
+  const delay = Math.max(250, Math.min(10000, Math.round((parseFloat(stepDelayS && stepDelayS.value)||1.5)*1000)));
+  if(autoPlayBtn) autoPlayBtn.textContent = 'Pause';
+  autoTimer = setInterval(()=>{
+    if(!steps || curStep >= steps.length-1){ stopAutoPlay(); return; }
+    renderStep(curStep+1);
+  }, delay);
+}
+function renderActionList(){
+  if(!actionsList || !steps) return;
+  if(steps.length<=1){ actionsList.innerHTML = '<div class="empty-list">Aucune action à afficher.</div>'; return; }
+  const active = Math.min(curStep+1, steps.length-1);
+  actionsList.innerHTML = steps.slice(1).map((st, idx0)=>{
+    const idx = idx0+1;
+    const cls = idx <= curStep ? 'done' : (idx === active ? 'current' : '');
+    const tag = isEndActionStep(st) ? '<span class="step-tag end">FIN DE TOUR</span>' : '';
+    const currentAttr = idx === active ? ' aria-current="step"' : '';
+    const actionText = escHtml(displayActionText(st.action || '—'));
+    return '<div class="action-item '+cls+'" data-step="'+idx+'" role="button" tabindex="0" title="Aller à l’étape '+idx+'" aria-label="Aller à l’étape '+idx+' : '+actionText+'"'+currentAttr+'><div class="action-number">'+idx+'</div><div class="action-text">'+actionText+tag+'</div></div>';
+  }).join('');
+}
+function jumpToActionListStep(stepNumber){
+  if(!steps || steps.length<=1) return;
+  const idx = Math.max(1, Math.min(steps.length-1, Math.round(Number(stepNumber) || 1)));
+  stopAutoPlay();
+  // La liste affiche les actions à exécuter : cliquer sur la ligne N affiche
+  // l’état juste avant l’action N, et la garde en “Prochaine action”.
+  renderStep(idx - 1);
+}
+function handleActionListActivation(target){
+  if(!actionsList || !target || !target.closest) return false;
+  const item = target.closest('.action-item[data-step]');
+  if(!item || !actionsList.contains(item)) return false;
+  jumpToActionListStep(item.dataset.step);
+  return true;
+}
+function ensureCurrentActionVisible(){
+  if(!actionsList || !steps || steps.length<=1) return;
+  const activeIdx = Math.min(curStep+1, steps.length-1);
+  const item = actionsList.querySelector('[data-step="'+activeIdx+'"]');
+  if(!item) return;
+  requestAnimationFrame(()=>{
+    const sample = actionsList.querySelector('.action-item');
+    const sampleH = sample ? sample.getBoundingClientRect().height : 34;
+    const margin = Math.max(18, sampleH + 6); // environ une étape visible au-dessus/dessous
+    const listRect = actionsList.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    const topGap = itemRect.top - listRect.top;
+    const bottomGap = listRect.bottom - itemRect.bottom;
+    if(topGap < margin){
+      actionsList.scrollBy({ top: topGap - margin, behavior: 'smooth' });
+    } else if(bottomGap < margin){
+      actionsList.scrollBy({ top: margin - bottomGap, behavior: 'smooth' });
+    }
+  });
+}
+function updateStepControls(){
+  const prev = document.getElementById('prevStep');
+  const next = document.getElementById('nextStep');
+  const counter = document.getElementById('stepCounter');
+  const passBtn = enterSyncBtn;
+  const finished = !steps || curStep >= steps.length-1;
+  const nextEnd = false;
+  if(prev) prev.disabled = !steps || curStep===0;
+  if(next){
+    next.disabled = finished || nextEnd;
+    next.textContent = '▶';
+    next.classList.remove('hidden');
+  }
+  if(passBtn) passBtn.classList.toggle('hidden', !nextEnd);
+  if(counter && steps) counter.textContent = Math.min(curStep+1, steps.length-1)+' / '+(steps.length-1);
+  if(autoPlayBtn) autoPlayBtn.disabled = finished || nextEnd;
+  if(backToSyncBtn) backToSyncBtn.classList.toggle('hidden', workflowPhase !== 'final_solved');
+}
+
+function exportCurrentPlan(){
+  if(!lastSolvePayload && !lastResult){
+    setSolveStatus('Aucun diagnostic à exporter pour le moment. Importe un screenshot puis lance une résolution.');
+    return;
+  }
+
+  const now = new Date();
+  const safeStamp = now.toISOString().replace(/[:.]/g,'-');
+  const exportData = {
+    export_version: 'bolgrot_user_t6_unique_plan_export',
+    exported_at: now.toISOString(),
+    source: {
+      app: 'bolgrot_user_t6_unique.html',
+      solver: engineLabel() + ' · T6 unique',
+      note: 'Export généré côté navigateur après résolution. Il contient le screenshot analysé sous forme de coordonnées/détection, pas l’image elle-même.',
+    },
+    detection: lastResult ? {
+      enemies_detected: lastResult.enemies.map(e => ({ gx:e.gx, gy:e.gy, frac:e.frac, ox:e.ox, oy:e.oy })),
+      glyphs_detected: (lastResult.glyphs || []).map(g => ({ gx:g.gx, gy:g.gy, size:g.size, cx:g.cx, cy:g.cy })),
+      enemy_count: lastResult.enemies.length,
+      glyph_count: (lastResult.glyphs || []).length,
+      confidence_on_field_fraction: lastResult.onFrac,
+      mean_enemy_pixel_deviation: lastResult.meanDev,
+      calibration: {
+        image_width: lastResult.w,
+        image_height: lastResult.h,
+        s: lastResult.s,
+        Ox: lastResult.Ox,
+        Oy: lastResult.Oy,
+        r: lastResult.r,
+        player_blob: lastResult.player ? { cx:lastResult.player.cx, cy:lastResult.player.cy, size:lastResult.player.size, xmin:lastResult.player.xmin, xmax:lastResult.player.xmax, ymin:lastResult.player.ymin, ymax:lastResult.player.ymax } : null,
+        bolgrot_blob: lastResult.bolgrot ? { cx:lastResult.bolgrot.cx, cy:lastResult.bolgrot.cy, size:lastResult.bolgrot.size, xmin:lastResult.bolgrot.xmin, xmax:lastResult.bolgrot.xmax, ymin:lastResult.bolgrot.ymin, ymax:lastResult.bolgrot.ymax } : null,
+        anchor_y_residual_px: lastResult.resid,
+      },
+    } : null,
+    solve_request: lastSolvePayload ? JSON.parse(JSON.stringify(lastSolvePayload)) : null,
+    solve_time_ms: lastSolveMs,
+    solve_result: solveResult ? JSON.parse(JSON.stringify(solveResult)) : null,
+    replay_steps_with_initial_state: steps ? JSON.parse(JSON.stringify(steps)) : [],
+    workflow: {
+      phase: workflowPhase,
+      phase1_pass_index: phase1PassIndex,
+      sync_state: syncState ? JSON.parse(JSON.stringify(syncState)) : null,
+      manual_t6_glyphs: JSON.parse(JSON.stringify(manualT6Glyphs)),
+    },
+    current_visible_step_index: steps ? curStep : null,
+    failure_diagnostic: (!steps || !isWinResult(solveResult)) ? {
+      detection_issues: detectionIssues(lastResult, 't6'),
+      profile_loaded: !!activePrimaryProfile(),
+      profiles: activeSolverProfiles() ? JSON.parse(JSON.stringify(activeSolverProfiles())) : null,
+      adaptive_beam: findAdaptiveBeamSummary(solveResult),
+      adaptive_attempts: solveResult && solveResult.debug ? solveResult.debug.adaptive_beam_attempts || [] : []
+    } : null,
+  };
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type:'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bolgrot_plan_export_' + safeStamp + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  setSolveStatus('Plan exporté au format JSON.');
+}
+
+
+function cloneCells(arr){ return (arr || []).map(c => [c[0], c[1]]); }
+function makeInitialStepFromDetection(){
+  const t = parseInt(startTurn.value,10)||6;
+  return {
+    player:[PLAYER_CELL.gx,PLAYER_CELL.gy],
+    enemies: lastResult.enemies.map(e=>[e.gx,e.gy]),
+    glyphs: (lastResult.glyphs || []).map(g=>[g.gx,g.gy]),
+    pv:parseInt(startPv.value,10)||40, pa:10, doubles:0, game_turn:t,
+    action:'État initial · tour '+t, action_raw:null,
+    enemies_remaining: lastResult.enemies.length,
+    glyphs_remaining: (lastResult.glyphs || []).length,
+  };
+}
+function makeInitialStepFromSyncState(){
+  return {
+    player: cloneCells([syncState.player])[0],
+    enemies: cloneCells(syncState.enemies),
+    glyphs: cloneCells(manualT6Glyphs),
+    pv:syncState.pv, pa:syncState.pa, doubles:syncState.doubles, game_turn:syncState.game_turn,
+    action:'État resynchronisé · tour '+syncState.game_turn+' · glyphes T6 saisis', action_raw:null,
+    enemies_remaining: syncState.enemies.length,
+    glyphs_remaining: manualT6Glyphs.length,
+  };
+}
+function buildSteps(res, initOverride){
+  const init = initOverride || makeInitialStepFromDetection();
+  steps = [init].concat(res.plan_full_steps || []);
+}
+function cloneStepForSync(st){
+  return {
+    player: cloneCells([st.player])[0],
+    enemies: cloneCells(st.enemies),
+    glyphs: [],
+    pv:st.pv, pa:st.pa, doubles:st.doubles, game_turn:st.game_turn,
+    action:'État T6 après passage du tour', action_raw:null,
+    enemies_remaining: (st.enemies_remaining!=null?st.enemies_remaining:st.enemies.length),
+    glyphs_remaining: 0,
+  };
+}
+
+function drawArrowSegment(rawStart, rawEnd, color){
+  if(!arrowLayer || !rawStart || !rawEnd) return;
+  const vx = rawEnd[0] - rawStart[0];
+  const vy = rawEnd[1] - rawStart[1];
+  const len = Math.hypot(vx, vy) || 1;
+  const ux = vx / len;
+  const uy = vy / len;
+  const nx = -uy;
+  const ny = ux;
+
+  // Même logique visuelle que Minogolem : gros trait arrondi + contour sombre + vraie pointe.
+  // Les trims gardent la pointe sur le centre de la case d'arrivée sans masquer toute la tuile.
+  const startTrim = 0;
+  const endTrim = Math.min(SD * 0.46, Math.max(3, len * 0.42));
+  const headLen = Math.min(Math.max(10, SD * 0.58), Math.max(7, len * 0.62));
+  const headHalf = Math.max(6, SD * 0.28);
+  const lineWidth = Math.max(6, SD * RD * 0.78);
+  const outline = 'rgba(0,0,0,.48)';
+
+  const lineStart = [rawStart[0] + ux * startTrim, rawStart[1] + uy * startTrim];
+  const arrowTip = rawEnd;
+  const lineEnd = [rawEnd[0] - ux * endTrim, rawEnd[1] - uy * endTrim];
+  const polylinePoints = `${lineStart[0]},${lineStart[1]} ${lineEnd[0]},${lineEnd[1]}`;
+
+  const outlineLine = document.createElementNS(NS, 'polyline');
+  outlineLine.setAttribute('points', polylinePoints);
+  outlineLine.setAttribute('fill', 'none');
+  outlineLine.setAttribute('stroke', outline);
+  outlineLine.setAttribute('stroke-width', String(lineWidth + 4));
+  outlineLine.setAttribute('stroke-linecap', 'round');
+  outlineLine.setAttribute('stroke-linejoin', 'round');
+
+  const mainLine = document.createElementNS(NS, 'polyline');
+  mainLine.setAttribute('points', polylinePoints);
+  mainLine.setAttribute('fill', 'none');
+  mainLine.setAttribute('stroke', color);
+  mainLine.setAttribute('stroke-width', String(lineWidth));
+  mainLine.setAttribute('stroke-linecap', 'round');
+  mainLine.setAttribute('stroke-linejoin', 'round');
+
+  const arrowBaseX = arrowTip[0] - ux * headLen;
+  const arrowBaseY = arrowTip[1] - uy * headLen;
+
+  const headOutline = document.createElementNS(NS, 'polygon');
+  headOutline.setAttribute('points', [
+    [arrowTip[0], arrowTip[1]],
+    [arrowBaseX + nx * (headHalf + 2), arrowBaseY + ny * (headHalf + 2)],
+    [arrowBaseX - nx * (headHalf + 2), arrowBaseY - ny * (headHalf + 2)]
+  ].map(([x,y]) => `${x},${y}`).join(' '));
+  headOutline.setAttribute('fill', outline);
+
+  const head = document.createElementNS(NS, 'polygon');
+  head.setAttribute('points', [
+    [arrowTip[0], arrowTip[1]],
+    [arrowBaseX + nx * headHalf, arrowBaseY + ny * headHalf],
+    [arrowBaseX - nx * headHalf, arrowBaseY - ny * headHalf]
+  ].map(([x,y]) => `${x},${y}`).join(' '));
+  head.setAttribute('fill', color);
+
+  arrowLayer.appendChild(outlineLine);
+  arrowLayer.appendChild(mainLine);
+  arrowLayer.appendChild(headOutline);
+  arrowLayer.appendChild(head);
+}
+function drawArrow(from,to,kind){
+  if(!arrowLayer || !from || !to) return;
+  if(from[0]===to[0] && from[1]===to[1]) return;
+
+  const start = dispXY(from[0], from[1]);
+  const end = dispXY(to[0], to[1]);
+  const rawStart = [start.x, start.y];
+  const rawEnd = [end.x, end.y];
+  const isDouble = kind === 'double';
+  const color = '#f59e0b';
+
+  if(!isDouble){
+    drawArrowSegment(rawStart, rawEnd, color);
+    return;
+  }
+
+  // Bond double : deux flèches successives, centrées sur la case sautée.
+  const midGx = (from[0] + to[0]) / 2;
+  const midGy = (from[1] + to[1]) / 2;
+  const mid = (Number.isInteger(midGx) && Number.isInteger(midGy))
+    ? dispXY(midGx, midGy)
+    : { x:(start.x + end.x) / 2, y:(start.y + end.y) / 2 };
+  const rawMid = [mid.x, mid.y];
+
+  drawArrowSegment(rawStart, rawMid, color);
+  drawArrowSegment(rawMid, rawEnd, color);
+}
+
+function drawImmoTarget(cell){
+  const p=dispXY(cell[0],cell[1]);
+  const poly=document.createElementNS(NS,'polygon');
+  poly.setAttribute('points',diamond(p.x,p.y));
+  poly.setAttribute('fill','rgba(167,139,250,0.18)'); poly.setAttribute('stroke','#a78bfa');
+  poly.setAttribute('stroke-width','2.2'); poly.setAttribute('stroke-dasharray','3 2');
+  markerLayer.appendChild(poly);
+}
+
+function escHtml(v){
+  return String(v==null?'':v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+}
+function fmtScore(v){
+  if(v===Infinity) return '∞';
+  if(v===-Infinity) return '-∞';
+  if(typeof v!=='number' || !isFinite(v)) return '—';
+  return Math.round(v).toLocaleString('fr-FR');
+}
+function cellPairText(c){ return Array.isArray(c) ? '('+c[0]+','+c[1]+')' : '—'; }
+function renderScoreParts(parts){
+  if(!parts) return '';
+  const entries = Object.entries(parts).filter(([_,v]) => typeof v==='number');
+  if(!entries.length) return '';
+  return '<ul>'+entries.map(([k,v]) => '<li>'+escHtml(k)+' : <span class="audit-score">'+fmtScore(v)+'</span></li>').join('')+'</ul>';
+}
+function renderRejectReasons(summary){
+  if(!summary || !summary.by_reason) return 'aucun rejet';
+  const entries = Object.entries(summary.by_reason).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length) return 'aucun rejet';
+  return entries.map(([k,v]) => '<span class="audit-reject">'+escHtml(k)+'</span> × '+v).join('<br>');
+}
+function renderAuditBox(st){
+  const box = document.getElementById('stepAudit');
+  if(!box) return;
+  if(!st || !st.audit){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  const audit = st.audit;
+  const chosen = audit.chosen || {};
+  const effects = chosen.effects || st.effects || {};
+  const parts = chosen.score_parts || st.score_parts;
+  const alt = audit.legal_alternatives_top || [];
+  const rep = effects.repulsions || [];
+  const attraction = effects.attraction || {};
+  const killed = effects.killed ? cellPairText(effects.killed) : '—';
+  const altHtml = alt.length
+    ? '<ul>'+alt.slice(0,4).map(a => '<li><span class="audit-ok">'+escHtml(a.action)+'</span> · '+fmtScore(a.score_total)+'</li>').join('')+'</ul>'
+    : '<em>aucune alternative légale hors action choisie</em>';
+  box.innerHTML =
+    '<h5>Audit V27</h5>'+
+    '<div>Score choisi : <span class="audit-score">'+fmtScore(chosen.score_total ?? st.score_total)+'</span></div>'+
+    renderScoreParts(parts)+
+    '<div style="margin-top:6px">Kill : '+escHtml(killed)+' · répulsions : '+rep.length+' · attirances modifiées : '+(attraction.changed_count||0)+'</div>'+
+    '<div style="margin-top:6px">Actions légales : '+audit.legal_count+' · rejetées : '+audit.rejected_count+'</div>'+
+    '<div style="margin-top:6px"><strong>Rejets</strong><br>'+renderRejectReasons(audit.rejected_summary)+'</div>'+
+    '<div style="margin-top:6px"><strong>Meilleures alternatives</strong>'+altHtml+'</div>';
+  box.classList.remove('hidden');
+}
+
+
+function renderStep(i){
+  if(!steps || !steps.length) return;
+  curStep = Math.max(0, Math.min(steps.length-1, i));
+  const st = steps[curStep];
+  const nextSt = steps[curStep+1] || null;
+  hoverCell=null;
+  renderGrid();
+  for(const e of st.enemies) placeEnemy({gx:e[0], gy:e[1]});
+  for(const g of (st.glyphs || [])) placeGlyph({gx:g[0], gy:g[1]});
+  let stepActionRaw = null;
+  if(nextSt){
+    stepActionRaw = nextSt.action_raw;
+    if(stepActionRaw && stepActionRaw.kind==='immo') drawImmoTarget([st.player[0]+stepActionRaw.dx, st.player[1]+stepActionRaw.dy]);
+  }
+  placeMarker(BOLGROT_CELL, '#f97316', 'Bolgrot');
+  placeMarker({gx:st.player[0], gy:st.player[1]}, '#22d3ee', 'Joueur · '+st.pv+' PV');
+  if(stepActionRaw && (stepActionRaw.kind==='astral'||stepActionRaw.kind==='double')) drawArrow(st.player, nextSt.player, stepActionRaw.kind);
+
+  const mainActionEl = document.getElementById('mainAction');
+  if(mainActionEl){
+    mainActionEl.classList.remove('hidden');
+    mainActionEl.textContent = nextSt ? displayActionText(nextSt.action || '—') : 'GG';
+  }
+  const pvpa = document.getElementById('stepPvPa'); if(pvpa) pvpa.textContent = st.pv+' PV · '+st.pa+' PA';
+  const turn = document.getElementById('stepTurn'); if(turn) turn.textContent = 'tour '+st.game_turn+' · '+st.doubles+' double(s)';
+  const rem = (st.enemies_remaining!=null) ? st.enemies_remaining : st.enemies.length;
+  const enemies = document.getElementById('stepEnemies'); if(enemies) enemies.textContent = rem+' restant(s)';
+  const grem = (st.glyphs_remaining!=null) ? st.glyphs_remaining : ((st.glyphs||[]).length);
+  const glyphs = document.getElementById('stepGlyphs'); if(glyphs) glyphs.textContent = grem+' restant(s)';
+  renderAuditBox(st);
+  renderActionList();
+  ensureCurrentActionVisible();
+  updateStepControls();
+}
+
+
+function renderPortfolioResults(res){
+  if(!portfolioBox) return;
+  const rows = (res && (res.portfolio_results || (res.debug && res.debug.portfolio_results))) || [];
+  if(!rows.length){ portfolioBox.classList.add('hidden'); portfolioBox.innerHTML=''; return; }
+  portfolioBox.classList.remove('hidden');
+  const fmtMs = v => (v==null ? '—' : (v>=1000 ? (v/1000).toFixed(1)+'s' : Math.round(v)+'ms'));
+  const fmtN = v => (v==null ? '—' : Number(v).toLocaleString('fr-FR'));
+  const fmtScoreShort = v => (v==null || !isFinite(v) ? '—' : Math.round(v).toLocaleString('fr-FR'));
+  const statusLabel = r => {
+    if(r.status==='skipped') return '<span class="bad">skip</span>';
+    if(r.win) return '<span class="win">Victoire</span>';
+    if(r.status==='no_plan') return '<span class="bad">Aucun</span>';
+    return '<span class="partial">Partiel</span>';
+  };
+  const fmtAdaptive = r => {
+    const ab = r && r.adaptive_beam ? r.adaptive_beam : null;
+    if(!ab || !ab.enabled) return '—';
+    if(ab.solved_at_beam != null) return fmtN(ab.solved_at_beam) + ' / ' + fmtN(ab.max_reached) + ' · ' + fmtN(ab.stage_count);
+    return '— / ' + fmtN(ab.max_reached) + ' · ' + fmtN(ab.stage_count);
+  };
+  const trs = rows.map(r => '<tr>'+
+    '<td title="'+escHtml(r.id||'')+'">'+escHtml(r.label||r.id||'?')+'</td>'+
+    '<td>'+statusLabel(r)+'</td>'+
+    '<td>'+fmtN(r.enemies_remaining)+'</td>'+
+    '<td>'+fmtN(r.actions)+'</td>'+
+    '<td>'+fmtN(r.turns_elapsed)+'</td>'+
+    '<td>'+fmtN(r.pv_final)+'</td>'+
+    '<td>'+fmtMs(r.elapsed_ms)+'</td>'+
+    '<td>'+fmtAdaptive(r)+'</td>'+
+    '<td>'+fmtN(r.expanded_nodes)+'</td>'+
+    '<td>'+fmtScoreShort(r.score)+'</td>'+
+  '</tr>').join('');
+  portfolioBox.innerHTML = '<table class="portfolio-table">'+
+    '<thead><tr><th>Stratégie</th><th>Résultat</th><th>Feux</th><th>Actions</th><th>Tours</th><th>PV</th><th>Temps</th><th>Adaptive</th><th>Nœuds</th><th>Score</th></tr></thead>'+
+    '<tbody>'+trs+'</tbody></table>';
+}
+
+function showSolveSummary(res, dt){
+  solveSummary.classList.remove('hidden');
+  let cls='warn', txt='partiel';
+  if(res.reason==='ok'){ cls='ok'; txt='gagné'; }
+  else if(res.reason==='goal_reached'){ cls='ok'; txt='déjà fini'; }
+  else if(res.reason==='no_plan'){ cls='bad'; txt='aucun plan'; }
+  const d = res.debug || {};
+  const fmtMsDiag = v => (v==null || !isFinite(Number(v))) ? '—' : (Number(v)>=1000 ? (Number(v)/1000).toFixed(1)+'s' : Math.round(Number(v))+'ms');
+  document.getElementById('sRes').innerHTML = '<span class="pill '+cls+'">'+txt+'</span>';
+  document.getElementById('sActions').textContent = (d.actions!=null?d.actions:(res.plan_full?res.plan_full.length:0))+' · '+dt+' ms';
+  document.getElementById('sRemain').textContent = (d.enemies_remaining!=null?d.enemies_remaining:'—')+' / '+(d.enemies_start!=null?d.enemies_start:'—');
+  document.getElementById('sPv').textContent = (d.pv_final!=null?d.pv_final:'—');
+  document.getElementById('sNodes').textContent = (d.expanded_nodes!=null?d.expanded_nodes.toLocaleString('fr-FR'):'—');
+  const rs = d.search_trace && d.search_trace.run_summary ? d.search_trace.run_summary : {};
+  const diagV58 = d.diagnostic_v58a4 || rs.diagnostic_v58a4 || (rs.adaptive_beam && rs.adaptive_beam.diagnostic_v58a4) || {};
+  const abV58 = diagV58.adaptive_beam || rs.adaptive_beam || {};
+  const budgetEl = document.getElementById('sBudgetFast');
+  if(budgetEl){
+    const fast = diagV58.fast_search_path_v58a ?? diagV58.payload_fast_search_path_v58a ?? rs.fast_search_path_v58a;
+    const budget = diagV58.time_budget_ms ?? rs.time_budget_ms ?? null;
+    const primary = diagV58.ctx_adaptive_primary_budget_ms ?? rs.primary_budget_ms ?? abV58.primary_budget_ms ?? null;
+    const fallback = diagV58.ctx_adaptive_fallback_min_budget_ms ?? null;
+    const beamCache = diagV58.beam_selection_cache_v61 ?? diagV58.payload_beam_selection_cache_v61;
+    const scoreCache = diagV58.scoring_cache_v62 ?? diagV58.payload_scoring_cache_v62;
+    const leanSearch = diagV58.lean_search_result_v63b ?? diagV58.payload_lean_search_result_v63b;
+    const scStats = diagV58.scoring_cache_stats_v62 || (rs && rs.scoring_cache_v62) || {};
+    const scTxt = scoreCache === false ? 'OFF' : scoreCache === true ? ('ON ' + ((scStats.hits!=null||scStats.misses!=null) ? '(' + (scStats.hits||0).toLocaleString('fr-FR') + '/' + (scStats.misses||0).toLocaleString('fr-FR') + ')' : '')) : '—';
+    budgetEl.textContent = 'budget ' + fmtMsDiag(budget) + ' · primaire ' + fmtMsDiag(primary) + ' · fallback≥' + fmtMsDiag(fallback) + ' · fast ' + (fast === false ? 'OFF' : fast === true ? 'ON' : '—') + ' · lean ' + (leanSearch === false ? 'OFF' : leanSearch === true ? 'ON' : '—') + ' · beam cache ' + (beamCache === false ? 'OFF' : beamCache === true ? 'ON' : '—') + ' · score cache ' + scTxt;
+  }
+  const adaptiveEl = document.getElementById('sAdaptiveV58A4');
+  if(adaptiveEl){
+    const stop = diagV58.run_stop_reason || diagV58.stop_reason || abV58.stop_reason || rs.adaptive_stop_reason || '—';
+    const stages = abV58.stage_count ?? diagV58.stage_count ?? rs.adaptive_stage_count ?? '—';
+    const scheduleLen = (abV58.schedule && abV58.schedule.length) || (diagV58.schedule && diagV58.schedule.length) || rs.adaptive_schedule_length || '—';
+    const maxReached = abV58.max_reached ?? diagV58.max_reached ?? rs.adaptive_max_reached ?? '—';
+    const timeHit = rs.time_budget_hit === true ? 'oui' : rs.time_budget_hit === false ? 'non' : '—';
+    adaptiveEl.textContent = 'stop ' + stop + ' · paliers ' + stages + '/' + scheduleLen + ' · max ' + maxReached + ' · time hit ' + timeHit;
+  }
+  const ttEl = document.getElementById('sTT');
+  if(ttEl) ttEl.textContent = (rs.tt_size!=null ? rs.tt_size.toLocaleString('fr-FR') : '—') +
+    ' · dominés ' + (rs.pruned_tt_dominated!=null ? rs.pruned_tt_dominated.toLocaleString('fr-FR') : '—');
+  const prEl = document.getElementById('sPrune');
+  if(prEl) prEl.textContent = 'fin ' + (rs.pruned_useless_end_turn!=null ? rs.pruned_useless_end_turn.toLocaleString('fr-FR') : '—') +
+    ' · cycles ' + (rs.pruned_recent_cycle!=null ? rs.pruned_recent_cycle.toLocaleString('fr-FR') : '—');
+  const divEl = document.getElementById('sDiversity');
+  if(divEl) {
+    if(rs.solver_engine === 'lds_v27') {
+      const found = rs.lds_found_discrepancy!=null ? rs.lds_found_discrepancy : '—';
+      const maxd = rs.lds_max_discrepancy!=null ? rs.lds_max_discrepancy : '—';
+      const passes = rs.lds_passes_completed!=null ? rs.lds_passes_completed : '—';
+      const cuts = rs.discrepancy_cut!=null ? rs.discrepancy_cut.toLocaleString('fr-FR') : '—';
+      divEl.textContent = 'LDS · disc ' + found + '/' + maxd + ' · passes ' + passes + ' · coupés ' + cuts;
+    } else {
+      const active = rs.diversity_enabled === false ? 'off' : 'on';
+      const kept = rs.diversity_buckets_kept_max!=null ? rs.diversity_buckets_kept_max.toLocaleString('fr-FR') : '—';
+      const seen = rs.diversity_buckets_seen_max!=null ? rs.diversity_buckets_seen_max.toLocaleString('fr-FR') : '—';
+      const bucket = rs.diversity_selected_bucket!=null ? rs.diversity_selected_bucket.toLocaleString('fr-FR') : '—';
+      divEl.textContent = active + ' · buckets ' + kept + '/' + seen + ' · repêchés ' + bucket;
+    }
+  }
+  const stEl = document.getElementById('sStrategy');
+  if(stEl) {
+    const ps = d.portfolio_summary || {};
+    const strat = (d.winning_strategy && (d.winning_strategy.label || d.winning_strategy.id)) || ps.winner_label || engineLabel() || '—';
+    stEl.textContent = strat + adaptiveBeamShortLabel(res);
+  }
+  renderPortfolioResults(res);
+}
+
+
+function baseSolvePayloadFromState(st, glyphs){
+  const requestedBeamWidth = 5000;
+  const timeBudgetMs = Math.max(5000, Math.min(180000, (parseInt(timeBudgetS.value,10)||20)*1000));
+  const payload = {
+    board: BOARD_DEF,
+    player: cloneCells([st.player])[0],
+    bolgrot: [BOLGROT_CELL.gx, BOLGROT_CELL.gy],
+    enemies: cloneCells(st.enemies),
+    glyphs: cloneCells(glyphs || st.glyphs || []),
+    pv:st.pv, pa:st.pa, turn:st.game_turn, doubles:st.doubles,
+    beamWidth: requestedBeamWidth, maxSteps:360, timeBudgetMs,
+    perfInstrumentationV57:true,
+    fastSearchPathV58A: true,
+    leanFastSearchResultV63B: true,
+    scoringCacheV62: false,
+    finalUserSolverV58A4:true,
+    finalUserSolverV61:true,
+    finalUserSolverV62:true,
+    finalUserSolverV63A:true,
+    finalUserSolverV63B:true,
+    allocationDiagnosticsV63A:true,
+    leanSearchResultDiagnosticsV63B:true,
+    beamSelectionCacheV61:true,
+    adaptiveFinalUserFallbackReserveMs:500,
+    adaptivePrimaryBudgetMs: Math.max(500, timeBudgetMs - 500),
+    adaptiveFallbackMinBudgetMs: 500,
+    solverEngine: 'solvability_v29',
+    enableLargeBeam:false,
+    enableBaselineBeam:false,
+    strategyIds:['beam_clean_v47_weights_adaptive'],
+    enabledStrategyIds:['beam_clean_v47_weights_adaptive'],
+    enableV47WeightProfiles:false,
+    enableV56AdaptiveBeam:true,
+    v56AdaptiveBeam:true,
+    adaptiveBeam:true,
+    adaptiveFallbackPolicy:'late',
+    v56AdaptiveFallbackPolicy:'late',
+    v47WeightProfileCount:1,
+    v38MultiLane:true,
+    diversityEnabled:true,
+  };
+  return applySolverProfileToPayload(payload, requestedBeamWidth, activePrimaryProfile(), 'primary');
+}
+function engineLabel(){
+  const primary = activePrimaryProfile();
+  const fallback = activeFallbackProfile();
+  return profileDisplayLabel(primary) + ' · principal automatique + ' + profileDisplayLabel(fallback) + ' secours · Adaptive V56E late aggressive';
+}
+function findAdaptiveBeamSummary(res){
+  const d = res && res.debug ? res.debug : {};
+  const rs = d.search_trace && d.search_trace.run_summary ? d.search_trace.run_summary : null;
+  if(rs && rs.adaptive_beam) return rs.adaptive_beam;
+  const rows = (res && (res.portfolio_results || d.portfolio_results)) || [];
+  for(const r of rows){
+    if(r && r.adaptive_beam) return r.adaptive_beam;
+  }
+  return null;
+}
+function adaptiveBeamShortLabel(res){
+  const ab = findAdaptiveBeamSummary(res);
+  if(!ab || !ab.enabled) return '';
+  const parts = [];
+  if(ab.solved_at_beam != null) parts.push('résolu à beam ' + ab.solved_at_beam);
+  else if(ab.max_reached != null) parts.push('max ' + ab.max_reached);
+  if(ab.stage_count != null) parts.push(ab.stage_count + ' palier' + (ab.stage_count > 1 ? 's' : ''));
+  if(ab.restart_count === 0) parts.push('0 relance');
+  return parts.length ? ' · ' + parts.join(' · ') : '';
+}
+function solveBolgrotWorkerTask(payload, taskLabel){
+  let settled = false;
+  let cancelled = false;
+  let timer = null;
+  let worker = null;
+  const promise = new Promise((resolve,reject)=>{
+    worker = new Worker(getWorkerURL());
+    const hardTimeout = Math.max(15000, Math.min(240000, (payload.timeBudgetMs || 20000) + 15000));
+    timer = setTimeout(()=>{
+      if(settled) return;
+      settled = true;
+      try{ worker.terminate(); }catch(_e){}
+      reject(new Error('Timeout solveur ('+Math.round(hardTimeout/1000)+' s)'));
+    }, hardTimeout);
+    function attachTaskLabel(body){
+      if(body && taskLabel){ if(!body.debug) body.debug = {}; body.debug.auto_solver_task_label = taskLabel; }
+      return body;
+    }
+    worker.onmessage = (e)=>{
+      const m = e.data || {};
+      if(m.type==='ready'){ return; }
+      if(settled) return;
+      if(m.type==='result'){
+        settled = true;
+        clearTimeout(timer);
+        try{ worker.terminate(); }catch(_e){}
+        resolve(attachTaskLabel(m.body));
+      } else if(m.type==='error'){
+        settled = true;
+        clearTimeout(timer);
+        try{ worker.terminate(); }catch(_e){}
+        reject(new Error(m.message || 'erreur worker'));
+      }
+    };
+    worker.onerror = (err)=>{
+      if(settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try{ worker.terminate(); }catch(_e){}
+      reject(new Error(err.message || 'erreur worker'));
+    };
+    worker.postMessage({ type:'solve', payload });
+  });
+  return {
+    promise,
+    cancel(){
+      if(settled || cancelled) return;
+      cancelled = true;
+      settled = true;
+      if(timer) clearTimeout(timer);
+      try{ if(worker) worker.terminate(); }catch(_e){}
+    }
+  };
+}
+function solverDebugNumber(res, key, fallback){
+  const d = res && res.debug ? res.debug : {};
+  if(typeof d[key] === 'number') return d[key];
+  const rs = d.search_trace && d.search_trace.run_summary ? d.search_trace.run_summary : {};
+  if(typeof rs[key] === 'number') return rs[key];
+  return fallback;
+}
+function summarizeAutoSolverResult(role, profile, res, elapsedMs, status){
+  const d = res && res.debug ? res.debug : {};
+  const rs = d.search_trace && d.search_trace.run_summary ? d.search_trace.run_summary : {};
+  return {
+    id: (profile && profile.id) || role,
+    label: (role === 'primary' ? 'ADL · ' : role === 'fallback' ? 'LOA · ' : '') + profileDisplayLabel(profile),
+    role,
+    status: status || 'done',
+    win: isWinResult(res),
+    enemies_remaining: solverDebugNumber(res, 'enemies_remaining', res && res.enemies_remaining),
+    actions: solverDebugNumber(res, 'actions', res && res.plan_full ? res.plan_full.length : null),
+    turns_elapsed: solverDebugNumber(res, 'turns_elapsed', null),
+    pv_final: solverDebugNumber(res, 'pv_final', null),
+    elapsed_ms: elapsedMs,
+    adaptive_beam: findAdaptiveBeamSummary(res),
+    expanded_nodes: solverDebugNumber(res, 'expanded_nodes', rs.expanded_nodes),
+    score: typeof d.score === 'number' ? d.score : (typeof rs.best_score === 'number' ? rs.best_score : null),
+    reason: res && res.reason
+  };
+}
+function compareFailureResults(a, b){
+  if(!a) return b;
+  if(!b) return a;
+  const ae = solverDebugNumber(a.result, 'enemies_remaining', 9999);
+  const be = solverDebugNumber(b.result, 'enemies_remaining', 9999);
+  if(ae !== be) return ae < be ? a : b;
+  const apv = solverDebugNumber(a.result, 'pv_final', -9999);
+  const bpv = solverDebugNumber(b.result, 'pv_final', -9999);
+  if(apv !== bpv) return apv > bpv ? a : b;
+  return (a.elapsedMs || 0) <= (b.elapsedMs || 0) ? a : b;
+}
+function attachAutoPortfolioDebug(chosen, allRuns, mode, started){
+  if(!chosen || !chosen.result) return chosen;
+  const res = chosen.result;
+  if(!res.debug) res.debug = {};
+  const completed = (allRuns || []).filter(r => r && r.result);
+  const rows = completed.map(r => summarizeAutoSolverResult(r.role, r.profile, r.result, r.elapsedMs, r.status || 'done'));
+  const skipped = (allRuns || []).filter(r => r && !r.result && r.status).map(r => ({
+    id: (r.profile && r.profile.id) || r.role,
+    label: (r.role === 'primary' ? 'ADL · ' : r.role === 'fallback' ? 'LOA · ' : '') + profileDisplayLabel(r.profile),
+    role: r.role,
+    status: r.status,
+    win: false,
+    enemies_remaining: null,
+    actions: null,
+    turns_elapsed: null,
+    pv_final: null,
+    elapsed_ms: null,
+    adaptive_beam: null,
+    expanded_nodes: null,
+    score: null,
+    reason: r.status
+  }));
+  res.portfolio_results = rows.concat(skipped);
+  res.debug.portfolio_results = res.portfolio_results;
+  res.debug.auto_solver_portfolio = {
+    version: 'v64_adl_loa_auto',
+    mode,
+    hardwareConcurrency: navigator.hardwareConcurrency || null,
+    parallel_min_cores: AUTO_PORTFOLIO_PARALLEL_MIN_CORES,
+    primary_profile: activePrimaryProfile() ? { id:activePrimaryProfile().id, name:activePrimaryProfile().name, label:activePrimaryProfile().label } : null,
+    fallback_profile: activeFallbackProfile() ? { id:activeFallbackProfile().id, name:activeFallbackProfile().name, label:activeFallbackProfile().label } : null,
+    chosen_role: chosen.role,
+    chosen_label: profileDisplayLabel(chosen.profile),
+    total_elapsed_ms: Math.round(performance.now() - started),
+  };
+  if(!res.debug.winning_strategy){
+    res.debug.winning_strategy = { id:(chosen.profile && chosen.profile.id) || chosen.role, label:profileDisplayLabel(chosen.profile), role:chosen.role };
+  }
+  return chosen;
+}
+async function runSingleProfileSolve(basePayload, profile, role){
+  const started = performance.now();
+  const payload = applySolverProfileToPayload(JSON.parse(JSON.stringify(basePayload)), basePayload.requestedBeamWidth || basePayload.beamWidth, profile, role);
+  const task = solveBolgrotWorkerTask(payload, role + ':' + profileDisplayLabel(profile));
+  const res = await task.promise;
+  const ab = findAdaptiveBeamSummary(res);
+  if(res){
+    if(!res.debug) res.debug = {};
+    res.debug.adaptive_beam_summary = ab || null;
+    res.debug.adaptive_beam_attempts = ab ? [{
+      beamWidth: ab.max_reached,
+      solved_at_beam: ab.solved_at_beam,
+      stage_count: ab.stage_count,
+      elapsed_ms: Math.round(performance.now() - started),
+      win: isWinResult(res),
+      restart_count: ab.restart_count
+    }] : [];
+  }
+  return { role, profile, payload, result:res, elapsedMs:Math.round(performance.now() - started), status:'done' };
+}
+async function solveBolgrotAutoSequential(basePayload, started){
+  const primaryProfile = activePrimaryProfile();
+  const fallbackProfile = activeFallbackProfile();
+  const runs = [];
+  const primary = await runSingleProfileSolve(basePayload, primaryProfile, 'primary');
+  runs.push(primary);
+  if(isWinResult(primary.result)){
+    attachAutoPortfolioDebug(primary, runs.concat([{role:'fallback', profile:fallbackProfile, status:'skipped_primary_win'}]), 'sequential', started);
+    return primary;
+  }
+  const fallback = await runSingleProfileSolve(basePayload, fallbackProfile, 'fallback');
+  runs.push(fallback);
+  const chosen = isWinResult(fallback.result) ? fallback : compareFailureResults(primary, fallback);
+  attachAutoPortfolioDebug(chosen, runs, 'sequential', started);
+  return chosen;
+}
+async function solveBolgrotAutoParallel(basePayload, started){
+  const primaryProfile = activePrimaryProfile();
+  const fallbackProfile = activeFallbackProfile();
+  const primaryPayload = applySolverProfileToPayload(JSON.parse(JSON.stringify(basePayload)), basePayload.requestedBeamWidth || basePayload.beamWidth, primaryProfile, 'primary');
+  const fallbackPayload = applySolverProfileToPayload(JSON.parse(JSON.stringify(basePayload)), basePayload.requestedBeamWidth || basePayload.beamWidth, fallbackProfile, 'fallback');
+  const t0Primary = performance.now();
+  const t0Fallback = performance.now();
+  const primaryTask = solveBolgrotWorkerTask(primaryPayload, 'primary:' + profileDisplayLabel(primaryProfile));
+  const fallbackTask = solveBolgrotWorkerTask(fallbackPayload, 'fallback:' + profileDisplayLabel(fallbackProfile));
+  const wrap = (task, role, profile, payload, t0) => task.promise.then(result => ({role, profile, payload, result, elapsedMs:Math.round(performance.now() - t0), status:'done'}), error => ({role, profile, payload, error, elapsedMs:Math.round(performance.now() - t0), status:'error'}));
+  const p1 = wrap(primaryTask, 'primary', primaryProfile, primaryPayload, t0Primary);
+  const p2 = wrap(fallbackTask, 'fallback', fallbackProfile, fallbackPayload, t0Fallback);
+  const first = await Promise.race([p1, p2]);
+  const otherTask = first.role === 'primary' ? fallbackTask : primaryTask;
+  const otherPromise = first.role === 'primary' ? p2 : p1;
+  const runs = [first];
+  if(first.result && isWinResult(first.result)){
+    otherTask.cancel();
+    const cancelled = { role:first.role === 'primary' ? 'fallback' : 'primary', profile:first.role === 'primary' ? fallbackProfile : primaryProfile, status:'cancelled_winner_found' };
+    attachAutoPortfolioDebug(first, runs.concat([cancelled]), 'parallel', started);
+    return first;
+  }
+  const second = await otherPromise;
+  runs.push(second);
+  const valid = runs.filter(r => r && r.result);
+  if(!valid.length){
+    const err = (runs.find(r=>r && r.error) || {}).error;
+    throw err || new Error('Les deux solveurs automatiques ont échoué techniquement.');
+  }
+  const winning = valid.find(r => isWinResult(r.result));
+  const chosen = winning || valid.reduce((best, r) => compareFailureResults(best, r), null);
+  attachAutoPortfolioDebug(chosen, runs, 'parallel', started);
+  return chosen;
+}
+async function solveBolgrotAdaptive(basePayload){
+  const started = performance.now();
+  const mode = isParallelPortfolioAvailable() ? 'parallel' : 'sequential';
+  const solved = mode === 'parallel'
+    ? await solveBolgrotAutoParallel(basePayload, started)
+    : await solveBolgrotAutoSequential(basePayload, started);
+  return {
+    result: solved.result,
+    payload: solved.payload,
+    elapsedMs: Math.round(performance.now() - started),
+    attempts: solved.result && solved.result.debug ? solved.result.debug.adaptive_beam_attempts || [] : []
+  };
+}
+
+function findFirstEndStepIndex(arr){
+  if(!arr) return -1;
+  for(let i=1;i<arr.length;i++) if(arr[i].action_raw && arr[i].action_raw.kind==='end') return i;
+  return -1;
+}
+function setWorkflowStatus(html){ if(t5WorkflowStatus) t5WorkflowStatus.innerHTML = html; }
+
+function resetWorkflowForNewScreenshot(){
+  stopAutoPlay();
+  workflowPhase='detected'; phase1FullSteps=null; phase1PassIndex=-1; syncState=null; manualT6Glyphs=[]; finalSolveResult=null; t6GlyphOverflowAlerted=false;
+  steps=null; curStep=0; lastVisiblePlanKind='';
+  if(enterSyncBtn) enterSyncBtn.classList.add('hidden');
+  if(syncControls) syncControls.classList.add('hidden');
+  if(actionsList) actionsList.innerHTML='';
+  const mainActionEl = document.getElementById('mainAction'); if(mainActionEl){ mainActionEl.textContent=''; mainActionEl.classList.add('hidden'); }
+  const syncDbg = document.getElementById('syncDebug'); if(syncDbg) syncDbg.classList.add('hidden');
+  if(t5Editor) t5Editor.classList.toggle('hidden', !lastResult);
+  if(detectionLegend) detectionLegend.classList.toggle('hidden', !lastResult);
+  if(solveBtn) solveBtn.disabled = !lastResult;
+  updateSuspectDefaultNotice();
+  if(exportPlanBtn) exportPlanBtn.classList.add('hidden');
+  if(copyPlanBtn) copyPlanBtn.classList.add('hidden');
+  setWorkflowStatus('Screenshot T6 chargé. Clique sur “Résoudre” pour obtenir le plan final.');
+  showPhase('import');
+}
+
+function sameCell(a,b){ return a && b && a[0]===b[0] && a[1]===b[1]; }
+function cellKey(c){ return c[0]+','+c[1]; }
+function hasCell(arr,c){ return (arr||[]).some(x=>sameCell(x,c)); }
+function toggleCell(arr,c){
+  const out=[]; let removed=false;
+  for(const x of (arr||[])){
+    if(sameCell(x,c)){ removed=true; continue; }
+    out.push([x[0],x[1]]);
+  }
+  if(!removed) out.push([c[0],c[1]]);
+  out.sort((a,b)=>a[1]===b[1]?a[0]-b[0]:a[1]-b[1]);
+  return out;
+}
+function isBlockedCell(c){
+  if(!c) return true;
+  const gx=c[0], gy=c[1];
+  if(gx<0 || gy<0 || gy>=BOARD_DEF.length || gx>=BOARD_DEF[gy].length) return true;
+  if(BOARD_DEF[gy][gx]==='#') return true;
+  if(gx===BOLGROT_CELL.gx && gy===BOLGROT_CELL.gy) return true;
+  return false;
+}
+function svgCellFromEvent(ev){
+  const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  const inv = svg.getScreenCTM();
+  if(!inv) return null;
+  const p = pt.matrixTransform(inv.inverse());
+  let best=null, bestD=Infinity;
+  for(const c of CELLS){
+    const q=dispXY(c.gx,c.gy);
+    const d=Math.abs(p.x-q.x)/SD + Math.abs(p.y-q.y)/(SD*RD);
+    if(d<bestD){ bestD=d; best=[c.gx,c.gy]; }
+  }
+  return bestD<=1.08 ? best : null;
+}
+function isProtectedCell(c){
+  return sameCell(c, [PLAYER_CELL.gx, PLAYER_CELL.gy]) || sameCell(c, [BOLGROT_CELL.gx, BOLGROT_CELL.gy]);
+}
+function removeObjectCell(arr, c){ return (arr || []).filter(x => !(x.gx===c[0] && x.gy===c[1])); }
+function hasObjectCell(arr, c){ return (arr || []).some(x => x.gx===c[0] && x.gy===c[1]); }
+function editDetectionCell(c){
+  if(!lastResult || workflowPhase !== 'detected' || isBlockedCell(c) || isProtectedCell(c)) return;
+  let msg='Case confirmée vide.';
+  if(editMode === 'glyph'){
+    const exists = hasObjectCell(lastResult.glyphs, c);
+    lastResult.enemies = removeObjectCell(lastResult.enemies, c);
+    lastResult.glyphs = removeObjectCell(lastResult.glyphs, c);
+    if(!exists) lastResult.glyphs.push({gx:c[0], gy:c[1], size:0, manual:true});
+    msg='Correction glyphe appliquée.';
+  } else if(editMode === 'fire') {
+    const exists = hasObjectCell(lastResult.enemies, c);
+    lastResult.glyphs = removeObjectCell(lastResult.glyphs, c);
+    lastResult.enemies = removeObjectCell(lastResult.enemies, c);
+    if(!exists) lastResult.enemies.push({gx:c[0], gy:c[1], frac:1, manual:true});
+    msg='Correction feu appliquée.';
+  } else {
+    lastResult.glyphs = removeObjectCell(lastResult.glyphs, c);
+    lastResult.enemies = removeObjectCell(lastResult.enemies, c);
+  }
+  clearSuspectAt(c);
+  lastResult.enemies.sort((a,b)=>a.gy===b.gy?a.gx-b.gx:a.gy-b.gy);
+  lastResult.glyphs.sort((a,b)=>a.gy===b.gy?a.gx-b.gx:a.gy-b.gy);
+  renderDetectedState(msg);
+}
+function isInteractiveHoverPhase(){ return workflowPhase === 'detected'; }
+
+function renderSyncState(){ /* ancien workflow retiré */ }
+
+
+function enterT6SyncMode(){ /* ancien workflow retiré */ }
+
+
+async function solvePhase1(){
+  if(!lastResult || !lastResult.enemies){ setSolveStatus('Importe un screenshot T6 valide d’abord.'); return; }
+  stopAutoPlay();
+  setSolveStatus('<span class="spinner"></span>Chargement des profils ADL + LOA…');
+  try{
+    await loadSolverProfiles();
+  }catch(err){
+    alertConsole('<strong>Profils ADL/LOA invalides :</strong> '+escHtml(err.message || err), 'Profils ADL/LOA invalides. Vérifie profils.json.');
+    return;
+  }
+  const init = makeInitialStepFromDetection();
+  const payload = baseSolvePayloadFromState(init, init.glyphs);
+  lastSolvePayload = JSON.parse(JSON.stringify(payload));
+  startSolveTimer();
+  workflowPhase='solving_t6';
+  showPhase('import');
+  if(t5Editor) t5Editor.classList.add('hidden');
+  if(detectionLegend) detectionLegend.classList.add('hidden');
+  solveBtn.disabled=true;
+  if(stepNav) stepNav.classList.add('hidden');
+  if(solveSummary) solveSummary.classList.add('hidden');
+  if(exportPlanBtn) exportPlanBtn.classList.add('hidden');
+  if(copyPlanBtn) copyPlanBtn.classList.add('hidden');
+  if(portfolioBox){ portfolioBox.classList.add('hidden'); portfolioBox.innerHTML=''; }
+  solveResult=null; steps=null; lastSolveMs=null; syncState=null; manualT6Glyphs=[]; finalSolveResult=null;
+  if(enterSyncBtn) enterSyncBtn.classList.add('hidden');
+  if(syncControls) syncControls.classList.add('hidden');
+  const t0 = performance.now();
+  try{
+    const solved = await solveBolgrotAdaptive(payload);
+    stopSolveTimer();
+    const res = solved.result;
+    const dt = solved.elapsedMs || Math.round(performance.now()-t0);
+    lastSolvePayload = JSON.parse(JSON.stringify(solved.payload || payload));
+    lastSolveMs = dt; solveResult = res; finalSolveResult = res;
+    showSolveSummary(res, dt);
+    if(!isWinResult(res)){
+      showNoSolution('t6');
+      return;
+    }
+    buildSteps(res, init);
+    workflowPhase='final_solved'; lastVisiblePlanKind='t6';
+    if(stepsTitle) stepsTitle.textContent = 'Actions depuis T6';
+    if(stepsHint) stepsHint.innerHTML = 'Exécute les actions dans l’ordre jusqu’à la victoire.';
+    setSolveStatus('Solution trouvée. Plan prêt.');
+    setWorkflowStatus('Plan final calculé depuis le screenshot T6.');
+    switchView(false);
+    showPhase('t6');
+    if(stepNav) stepNav.classList.remove('hidden');
+    if(exportPlanBtn) exportPlanBtn.classList.remove('hidden');
+    if(copyPlanBtn) copyPlanBtn.classList.remove('hidden');
+    renderStep(0);
+  }catch(err){
+    stopSolveTimer();
+    handleSolveException(err);
+  }finally{
+    solveBtn.disabled=false;
+  }
+}
+
+
+async function solveFromSyncedT6(){ return solvePhase1(); }
+
+
+if(restartBtn) restartBtn.addEventListener('click', ()=>{
+  window.location.reload();
+});
+if(openTutorialBtn && tutorialBox) {
+  openTutorialBtn.setAttribute('aria-controls', 'tutorialBox');
+  openTutorialBtn.setAttribute('aria-expanded', tutorialBox.open ? 'true' : 'false');
+  openTutorialBtn.addEventListener('click', ()=>{
+    openTutorialBtn.classList.add('tutorial-seen');
+    tutorialBox.open = !tutorialBox.open;
+    openTutorialBtn.setAttribute('aria-expanded', tutorialBox.open ? 'true' : 'false');
+  });
+}
+if(editFireBtn) editFireBtn.addEventListener('click', ()=>setEditMode('fire'));
+if(editGlyphBtn) editGlyphBtn.addEventListener('click', ()=>setEditMode('glyph'));
+if(editEmptyBtn) editEmptyBtn.addEventListener('click', ()=>setEditMode('empty'));
+if(resetDetectionBtn) resetDetectionBtn.addEventListener('click', restoreOriginalDetection);
+solveBtn.addEventListener('click', solvePhase1);
+if(copyPlanBtn) copyPlanBtn.addEventListener('click', copyVisiblePlan);
+if(autoPlayBtn) autoPlayBtn.addEventListener('click', toggleAutoPlay);
+svg.addEventListener('mousemove', (ev)=>{
+  if(!isInteractiveHoverPhase()){ setHoverCell(null); return; }
+  const c = svgCellFromEvent(ev);
+  if(!c || isBlockedCell(c) || isProtectedCell(c)) { setHoverCell(null); return; }
+  setHoverCell(c);
+});
+svg.addEventListener('mouseleave', ()=>setHoverCell(null));
+svg.addEventListener('click', (ev)=>{
+  const c = svgCellFromEvent(ev);
+  if(!c || isBlockedCell(c)) return;
+  if(workflowPhase === 'detected'){
+    editDetectionCell(c);
+    return;
+  }
+  return;
+});
+exportPlanBtn.addEventListener('click', exportCurrentPlan);
+document.getElementById('prevStep').addEventListener('click', ()=>{ stopAutoPlay(); renderStep(curStep-1); });
+document.getElementById('nextStep').addEventListener('click', ()=>{ stopAutoPlay(); renderStep(curStep+1); });
+if(actionsList){
+  actionsList.addEventListener('click', (e)=>{ handleActionListActivation(e.target); });
+  actionsList.addEventListener('keydown', (e)=>{
+    if(e.key !== 'Enter' && e.key !== ' ') return;
+    if(handleActionListActivation(e.target)) e.preventDefault();
+  });
+}
+function shouldIgnoreGlobalDebugShortcut(e){
+  const target = e && e.target;
+  if(!target) return false;
+  const tag = String(target.tagName || '').toLowerCase();
+  return target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select';
+}
+function toggleAdvancedDebugPanel(){
+  if(!debugPanel) return;
+  debugPanel.classList.toggle('hidden');
+  if(!debugPanel.classList.contains('hidden')) debugPanel.open = true;
+}
+
+document.addEventListener('keydown', (e)=>{
+  if((e.key === 'j' || e.key === 'J') && !shouldIgnoreGlobalDebugShortcut(e)){
+    toggleAdvancedDebugPanel();
+    e.preventDefault();
+    return;
+  }
+  if(!steps) return;
+  if(e.key==='ArrowLeft'){ stopAutoPlay(); renderStep(curStep-1); e.preventDefault(); }
+  else if(e.key==='ArrowRight'){ stopAutoPlay(); renderStep(curStep+1); e.preventDefault(); }
+});
+
+
+renderGrid();
+showPhase('import');
+if(solveBtn) solveBtn.disabled=true;
+if(t5Editor) t5Editor.classList.add('hidden');
+})();
+</script>
+
+</body>
+</html>

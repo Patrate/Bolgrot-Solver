@@ -1,0 +1,98 @@
+{
+  "export_version": "bolgrot_v48_weight_profiles",
+  "exported_at": "2026-06-13T15:26:15.460Z",
+  "profiles": [
+    {
+      "id": "beam_clean_v47_weights_line_optimized_a",
+      "name": "Line Optimized A",
+      "label": "Beam Clean V49.1 · Line Optimized A",
+      "description": "Profil promu proprement depuis l’optimiseur V49.1. Source : V48 mutation 018 · V48 mutation 041 · V48 mutation 015 · V47 JSON · line strong seed",
+      "weights": {
+        "enemies": -955,
+        "pv": 262,
+        "mobility": 992,
+        "safeLandings": 163,
+        "maxLineRay": 9584,
+        "maxLineGlobal": 3680,
+        "alignment": 70,
+        "densityOver2": -11157,
+        "adjacentDensity": -12171,
+        "killTargets": 752,
+        "primaryClaims": -1142
+      },
+      "thresholds": [
+        {
+          "feature": "maxLineRay",
+          "gte": 4,
+          "value": 9030
+        },
+        {
+          "feature": "maxLineRay",
+          "gte": 6,
+          "value": 21264
+        },
+        {
+          "feature": "maxLineRay",
+          "gte": 8,
+          "value": 37336
+        },
+        {
+          "feature": "maxLineRay",
+          "gte": 10,
+          "value": 12339
+        }
+      ],
+      "scale": 0.976,
+      "beamWidthMultiplier": 1.101,
+      "diversityEliteRatio": 0.513,
+      "v38LaneProfile": "line",
+      "v38ProbeTopN": null
+    },
+	    {
+      "id": "anti_density_line",
+      "name": "Anti Density Line",
+      "label": "ADL",
+      "description": "Mutation générée automatiquement depuis “V48 mutation 001 · V48 mutation 001 · V48 mutation 003 · V48 mutation 006 · V63J · anti-density ligne hybride”.",
+      "weights": {
+        "enemies": -1506,
+        "pv": 410,
+        "mobility": 2072,
+        "safeLandings": 1211,
+        "maxLineRay": 8167,
+        "maxLineGlobal": 3715,
+        "alignment": 174,
+        "densityOver2": -49814,
+        "adjacentDensity": -10610,
+        "killTargets": 733,
+        "primaryClaims": -2842
+      },
+      "thresholds": [
+        {
+          "feature": "maxLineRay",
+          "gte": 5,
+          "value": 18110
+        },
+        {
+          "feature": "maxLineRay",
+          "gte": 7,
+          "value": 22912
+        },
+        {
+          "feature": "densityOver2",
+          "gte": 4,
+          "value": -28127
+        },
+        {
+          "feature": "adjacentDensity",
+          "gte": 2,
+          "value": -10380
+        }
+      ],
+      "scale": 1.108,
+      "beamWidthMultiplier": 0.994,
+      "diversityEliteRatio": 0.528,
+      "v38LaneProfile": "line",
+      "v38ProbeTopN": null
+    }
+  ]
+}
