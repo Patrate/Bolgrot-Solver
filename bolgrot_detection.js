@@ -1,4 +1,4 @@
-/* bolgrot_detection_v67_1.js — Détection screenshot : ancrage, feux, glyphes, conversion écran/grille.
+/* bolgrot_detection_v68.js — Détection screenshot : ancrage, feux, glyphes, conversion écran/grille.
    V67.1 : ne confond pas visibilité de crop et preuve visuelle. Les feux forts au bord restent confirmés ;
    les panneaux UI flottants sont signalés par leur géométrie écran (traits rectilignes) et leur signature locale. */
 
@@ -22,6 +22,13 @@ var DETECTION_PB_CELLS = new Set([
 
 var DARK_MAX = 90;
 var DARK_CHROMA = 30;
+// Repli d'ancrage translucide : l'UI blanche du joueur/Bolgrot (labels "2"/"1") est dessinee
+// par-dessus la scene, donc insensible a la transparence des entites (qui, elle, delave le sprite gris).
+var WHITE_ANCHOR_MIN = 185;      // luminance mini d'un pixel d'UI blanche (min des canaux)
+var WHITE_ANCHOR_CHROMA = 34;    // chroma maxi (blanc/gris clair, peu sature)
+var LABEL_OFFSET_X = 0.69;       // decalage label -> centre de tuile, en unites de tuile (mesure)
+var LABEL_OFFSET_Y = 0.05;
+var LABEL_ORANGE_REJECT = 0.10; // un label pose sur >=10% d'orange est un oeil de feu translucide, pas un label
 var MIN_BLOB_FRAC = 8e-5;
 var MAX_BLOB_FRAC = 7e-4;
 var FOOT_FRAC = 0.18;
@@ -36,6 +43,10 @@ var FIRE_PROFILE_NEAR = 0.34;
 var GLYPH_MIN_COMPONENT = 80;
 var GLYPH_MAX_COMPONENT = 6000;
 var GLYPH_MIN_NORM = 0.045;
+// Decoupage des glyphes fusionnes : deux glyphes violets adjacents peuvent se toucher dans le masque
+// et ne former qu'un seul composant connexe (frequent quand la transparence delave/etale le violet).
+var GLYPH_OVERSIZE_NORM = 0.9;   // au-dela de ~0.9*s^2, un composant couvre probablement 2 cellules
+var GLYPH_CELL_FRAC = 0.20;      // fraction violette mini dans la fenetre d'une cellule pour compter un glyphe
 
 function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
 function isGlyphPixelRGB(r, g, b) {
@@ -227,6 +238,60 @@ function findAnchors(data, w, h) {
       if (!best || calibrated.score>best.score) best={score:calibrated.score,pair_score:baseScore,validation:calibrated,player:L,bolgrot:R};
     }
   }
+
+  // ---- Repli d'ancrage sur l'UI blanche (transparence des entites) --------------------------
+  // Quand la transparence des entites est active en jeu, le fond vert du plateau transparait a
+  // travers le sprite gris du joueur (pose sur la plateforme verte) : ses pixels virent "trop verts"
+  // et "trop chromatiques", le masque sprite strict les rejette et le blob se fragmente sous minSz.
+  // Plus d'ancre gauche -> calibrage a demi-echelle ou introuvable. Le label "2" (et le "1" du Bolgrot)
+  // sont eux dessines par-dessus la scene et restent blancs et nets. On les detecte (blobs blancs hauts,
+  // meme y, distants de 10*s) et on recale via le scoring existant, qui rejette le ghosting a petite
+  // echelle. Cette detection tourne TOUJOURS et sa meilleure paire est mise en concurrence avec la
+  // paire stricte via le meme scoring : sur une capture opaque la paire stricte domine (~12 vs ~10)
+  // -> resultat inchange ; sur une capture translucide la paire stricte est fausse/faible/absente et
+  // la paire de labels l'emporte. NB : un mauvais calibrage strict peut "ghoster" a >=24 feux, donc un
+  // simple seuil de feux ne suffit pas a le detecter -> on laisse le scoring trancher.
+  {
+    var whiteMask = new Uint8Array(N);
+    for (var wi=0, wp=0; wi<N; wi++, wp+=4) {
+      var wr=data[wp], wg=data[wp+1], wb=data[wp+2];
+      var wmx=Math.max(wr,wg,wb), wmn=Math.min(wr,wg,wb);
+      if (wmn>WHITE_ANCHOR_MIN && (wmx-wmn)<WHITE_ANCHOR_CHROMA) whiteMask[wi]=1;
+    }
+    var whiteBlobs = components(whiteMask, w, h), labelBlobs = [];
+    for (var li=0; li<whiteBlobs.length; li++) {
+      var lbb=whiteBlobs[li], lw=lbb.xmax-lbb.xmin+1, lh=lbb.ymax-lbb.ymin+1;
+      if (lbb.touch) continue;
+      if (lh < lw*1.2) continue;                                   // un label est plus haut que large
+      if (lh < 8 || lh > 0.05*h+20) continue;                      // borne de taille absolue
+      if (lbb.size < Math.max(18, 2.5e-6*N) || lbb.size > 1.3e-4*N) continue;
+      if (lbb.cx < 0.06*w || lbb.cx > 0.95*w || lbb.cy < 0.12*h || lbb.cy > 0.78*h) continue;
+      // Rejet des yeux blancs des feux translucides : l'oeil est pose sur le corps orange du feu,
+      // alors que les tuiles Joueur/Bolgrot ne contiennent pas d'orange. Discriminant tres net
+      // (feu ~0.24 d'orange autour, label ~0.00).
+      var opad=Math.max(6, lh|0);
+      var ox0=Math.max(0,(lbb.xmin-opad)|0), ox1=Math.min(w,(lbb.xmax+opad)|0);
+      var oy0=Math.max(0,(lbb.ymin-opad)|0), oy1=Math.min(h,(lbb.ymax+opad)|0);
+      var ocnt=0, otot=0;
+      for (var oy=oy0; oy<oy1; oy++){ var obase=oy*w; for (var oxx=ox0; oxx<ox1; oxx++){ otot++; if (orange[obase+oxx]) ocnt++; } }
+      if (otot && ocnt/otot >= LABEL_ORANGE_REJECT) continue;
+      labelBlobs.push(lbb);
+    }
+    var labelBest = null;
+    for (var pi=0; pi<labelBlobs.length; pi++) for (var pj=0; pj<labelBlobs.length; pj++) {
+      if (pi===pj) continue;
+      var La=labelBlobs[pi], Ra=labelBlobs[pj], dxl=Ra.cx-La.cx, dyl=Math.abs(Ra.cy-La.cy);
+      if (dxl < 0.05*w || dxl > 0.6*w) continue;                   // joueur -> Bolgrot : d differe de 10
+      if (dyl > 0.05*dxl) continue;                                // meme k -> meme y ecran
+      var sl = dxl/10; if (sl<12 || sl>110) continue;
+      var Lc={cx:La.cx+LABEL_OFFSET_X*sl, cy:La.cy+LABEL_OFFSET_Y*sl, size:La.size};
+      var Rc={cx:Ra.cx+LABEL_OFFSET_X*sl, cy:Ra.cy+LABEL_OFFSET_Y*sl, size:Ra.size};
+      var calL = scoreAnchorPairWithCalibration(Lc, Rc, field, orange, w, h, 0);
+      if (!calL) continue;
+      if (!labelBest || calL.score>labelBest.score) labelBest={score:calL.score, pair_score:0, validation:calL, player:Lc, bolgrot:Rc};
+    }
+    if (labelBest && (!best || labelBest.score>best.score)) { best=labelBest; blobs=blobs.concat(labelBlobs); }
+  }
   return {best:best,field:field,orange:orange,glyphMask:glyphMask,blobs:blobs};
 }
 
@@ -412,21 +477,28 @@ function glyphReasons(item, confirmed) {
   return out;
 }
 
+function glyphCellPurpleEvidence(glyphMask, w, h, s, Ox, Oy, r, gx, gy) {
+  var cx=Ox+(gx-gy)*s, cy=Oy+(gx+gy)*s*r, hw=0.55*s, hh=0.55*s*r;
+  var x0=Math.max(0,(cx-hw)|0), x1=Math.min(w,(cx+hw)|0), y0=Math.max(0,(cy-hh)|0), y1=Math.min(h,(cy+hh)|0);
+  var cnt=0, tot=0, sx=0, sy=0;
+  for (var y=y0;y<y1;y++){ var base=y*w; for (var x=x0;x<x1;x++){ tot++; if (glyphMask[base+x]){ cnt++; sx+=x; sy+=y; } } }
+  return { frac: tot?cnt/tot:0, count:cnt, px:cnt?sx/cnt:cx, py:cnt?sy/cnt:cy };
+}
+
 function classifyGlyphs(glyphMask, w, h, s, Ox, Oy, r, enemies) {
   var minNormPixels=Math.max(GLYPH_MIN_COMPONENT,Math.round(GLYPH_MIN_NORM*s*s));
   var raw=components(glyphMask,w,h), enemyCells=new Set((enemies||[]).map(function(e){return e.gx+','+e.gy;}));
   var confirmedByCell=new Map(), suspectByCell=new Map(), allCandidates=[];
-  for (var i=0;i<raw.length;i++) {
-    var bb=raw[i];
-    if (bb.size<GLYPH_MIN_COMPONENT || bb.size>GLYPH_MAX_COMPONENT) continue;
-    if (bb.xmin<=1 || bb.xmax>=w-2 || bb.ymax>=h-2 || bb.cx<=0.08*w || bb.cx>=0.95*w || bb.cy<0 || bb.cy>=0.95*h) continue;
-    var gg=screenToGridApprox(bb.cx,bb.cy,s,Ox,Oy,r);
-    if (!isValidPlayableCell(gg.gx,gg.gy)) continue;
+  // Emet un candidat glyphe pour une empreinte violette a la position ecran (px,py). Chemin identique
+  // au comportement historique : un composant de taille normale appelle emitAt une fois sur son centroide.
+  function emitAt(px, py, size, wid, hei) {
+    var gg=screenToGridApprox(px,py,s,Ox,Oy,r);
+    if (!isValidPlayableCell(gg.gx,gg.gy)) return;
     var key=gg.gx+','+gg.gy;
-    if (DETECTION_PB_CELLS.has(key) || enemyCells.has(key)) continue;
-    var gxFloat=(gg.k+gg.d)/2,gyFloat=(gg.k-gg.d)/2,wid=bb.xmax-bb.xmin+1,hei=bb.ymax-bb.ymin+1;
-    var item={gx:gg.gx,gy:gg.gy,size:bb.size,cx:bb.cx,cy:bb.cy,raw_d:gg.d,raw_k:gg.k,
-      sizeNorm:bb.size/Math.max(1,s*s),gridResidual:Math.hypot(gxFloat-gg.gx,gyFloat-gg.gy),
+    if (DETECTION_PB_CELLS.has(key) || enemyCells.has(key)) return;
+    var gxFloat=(gg.k+gg.d)/2, gyFloat=(gg.k-gg.d)/2;
+    var item={gx:gg.gx,gy:gg.gy,size:size,cx:px,cy:py,raw_d:gg.d,raw_k:gg.k,
+      sizeNorm:size/Math.max(1,s*s),gridResidual:Math.hypot(gxFloat-gg.gx,gyFloat-gg.gy),
       width:wid,height:hei,aspect:wid/Math.max(1,hei)};
     item.confidence=confidenceGlyph(item);
     var strong=item.size>=minNormPixels && item.aspect>=1.20 && item.aspect<=3.40 && item.gridResidual<=0.28;
@@ -435,6 +507,28 @@ function classifyGlyphs(glyphMask, w, h, s, Ox, Oy, r, enemies) {
       if (!confirmedByCell.has(key) || item.confidence>confirmedByCell.get(key).confidence) confirmedByCell.set(key,item);
     } else if (!suspectByCell.has(key) || item.confidence>suspectByCell.get(key).confidence) {
       suspectByCell.set(key,item);
+    }
+  }
+  for (var i=0;i<raw.length;i++) {
+    var bb=raw[i];
+    if (bb.size<GLYPH_MIN_COMPONENT || bb.size>GLYPH_MAX_COMPONENT) continue;
+    if (bb.xmin<=1 || bb.xmax>=w-2 || bb.ymax>=h-2 || bb.cx<=0.08*w || bb.cx>=0.95*w || bb.cy<0 || bb.cy>=0.95*h) continue;
+    var wid=bb.xmax-bb.xmin+1, hei=bb.ymax-bb.ymin+1;
+    // Composant sur-dimensionne = probablement 2 glyphes adjacents fusionnes -> redecoupage par cellule.
+    // Les composants normaux suivent le chemin historique inchange (aucune regression sur l'opaque).
+    if (bb.size > GLYPH_OVERSIZE_NORM*s*s) {
+      var gc=screenToGridApprox(bb.cx,bb.cy,s,Ox,Oy,r), emitted=0;
+      var nomW=Math.round(1.86*s), nomH=Math.round(0.93*s);
+      for (var dgy=-1; dgy<=1; dgy++) for (var dgx=-1; dgx<=1; dgx++) {
+        var cgx=gc.gx+dgx, cgy=gc.gy+dgy;
+        if (!isValidPlayableCell(cgx,cgy)) continue;
+        var ev=glyphCellPurpleEvidence(glyphMask,w,h,s,Ox,Oy,r,cgx,cgy);
+        if (ev.frac < GLYPH_CELL_FRAC || ev.count < minNormPixels) continue;
+        emitAt(ev.px, ev.py, ev.count, nomW, nomH); emitted++;
+      }
+      if (emitted===0) emitAt(bb.cx, bb.cy, bb.size, wid, hei);
+    } else {
+      emitAt(bb.cx, bb.cy, bb.size, wid, hei);
     }
   }
   var glyphs=pruneSplitGlyphArtifacts(Array.from(confirmedByCell.values()),s);
